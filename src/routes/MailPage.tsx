@@ -149,9 +149,10 @@ export default function MailPage() {
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [composeMinimized, setComposeMinimized] = useState(false);
+  const [composeCancelConfirmOpen, setComposeCancelConfirmOpen] = useState(false);
   const [mailboxPickerOpen, setMailboxPickerOpen] = useState(false);
   const [composeDraft, setComposeDraft] = useState<ComposeDraft>({ to: "", subject: "", body: "" });
-  const [savedDraft, setSavedDraft] = useState<ComposeDraft | null>(null);
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledFor, setScheduledFor] = useState<string>("");
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
@@ -159,6 +160,15 @@ export default function MailPage() {
   const [messages, setMessages] = useState<Message[]>(() => demoMessages);
 
   const mailbox = useMemo(() => demoMailboxes.find((m) => m.id === mailboxId)!, [mailboxId]);
+  const hasDraft = useMemo(() => composeMinimized, [composeMinimized]);
+  const isComposeDirty = useMemo(() => {
+    if (composeDraft.to.trim() !== "") return true;
+    if (composeDraft.subject.trim() !== "") return true;
+    if (composeDraft.body.trim() !== "") return true;
+    if (attachments.length > 0) return true;
+    if (scheduleEnabled) return true;
+    return false;
+  }, [attachments.length, composeDraft.body, composeDraft.subject, composeDraft.to, scheduleEnabled]);
 
   useEffect(() => {
     // Switching mailbox should never keep old expanded state around.
@@ -183,24 +193,44 @@ export default function MailPage() {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [sendMenuOpen]);
 
-  const openCompose = (draft?: Partial<ComposeDraft>) => {
-    setComposeDraft((prev) => ({
-      to: draft?.to ?? prev.to,
-      subject: draft?.subject ?? prev.subject,
-      body: draft?.body ?? prev.body
-    }));
+  const beginCompose = (draft?: Partial<ComposeDraft>) => {
+    setComposeDraft({
+      to: draft?.to ?? "",
+      subject: draft?.subject ?? "",
+      body: draft?.body ?? ""
+    });
     setScheduleEnabled(false);
     setScheduledFor("");
     setSendMenuOpen(false);
+    setComposeCancelConfirmOpen(false);
     setAttachments([]);
+    setComposeMinimized(false);
     setComposeOpen(true);
   };
 
-  const closeCompose = () => {
+  const resumeCompose = () => {
+    setSendMenuOpen(false);
+    setComposeCancelConfirmOpen(false);
+    setComposeMinimized(false);
+    setComposeOpen(true);
+  };
+
+  const minimizeCompose = () => {
     setComposeOpen(false);
     setSendMenuOpen(false);
+    setComposeCancelConfirmOpen(false);
+    if (isComposeDirty) setComposeMinimized(true);
+  };
+
+  const discardCompose = () => {
+    setComposeOpen(false);
+    setSendMenuOpen(false);
+    setComposeCancelConfirmOpen(false);
+    setComposeMinimized(false);
+    setComposeDraft({ to: "", subject: "", body: "" });
     setScheduleEnabled(false);
     setScheduledFor("");
+    setAttachments([]);
   };
 
   const toggleExpanded = (messageId: string) => {
@@ -359,8 +389,16 @@ export default function MailPage() {
             <div className={styles.topbarTools}>
               <ProfileMenu />
             </div>
-            <button className={styles.composeButton} type="button" onClick={() => openCompose({ to: "", subject: "", body: "" })}>
-              Compose
+            <button
+              className={styles.composeButton}
+              type="button"
+              onClick={() => {
+                if (composeMinimized) resumeCompose();
+                else beginCompose({ to: "", subject: "", body: "" });
+              }}
+            >
+              <span>Compose</span>
+              {hasDraft && <span className={styles.draftPill}>Draft: 1</span>}
             </button>
           </div>
         </header>
@@ -438,7 +476,7 @@ export default function MailPage() {
                           onClick={() => {
                             setHoveredMessageId(msg.id);
                             setFocusedMessageId(msg.id);
-                            openCompose({ to: msg.from, subject: `Re: ${msg.subject}`, body: "" });
+                            beginCompose({ to: msg.from, subject: `Re: ${msg.subject}`, body: "" });
                           }}
                         >
                           <Reply className={styles.icon} aria-hidden="true" />
@@ -452,7 +490,7 @@ export default function MailPage() {
                           onClick={() => {
                             setHoveredMessageId(msg.id);
                             setFocusedMessageId(msg.id);
-                            openCompose({ to: "", subject: `Fwd: ${msg.subject}`, body: msg.text ?? "" });
+                            beginCompose({ to: "", subject: `Fwd: ${msg.subject}`, body: msg.text ?? "" });
                           }}
                         >
                           <Forward className={styles.icon} aria-hidden="true" />
@@ -615,12 +653,17 @@ export default function MailPage() {
       {!composeOpen && (
         <button
           type="button"
-          className={styles.fabCompose}
-          aria-label="Compose"
-          title="Compose"
-          onClick={() => openCompose(savedDraft ?? { to: "", subject: "", body: "" })}
+          className={styles.composeDock}
+          aria-label={composeMinimized ? "Resume draft" : "Compose"}
+          title={composeMinimized ? "Resume draft" : "Compose"}
+          onClick={() => {
+            if (composeMinimized) resumeCompose();
+            else beginCompose({ to: "", subject: "", body: "" });
+          }}
         >
           <Pencil className={styles.icon} aria-hidden="true" />
+          <span className={styles.composeDockText}>{composeMinimized ? "Resume" : "Compose"}</span>
+          {composeMinimized && <span className={styles.composeDockDraftPill}>Draft: 1</span>}
         </button>
       )}
 
@@ -670,7 +713,15 @@ export default function MailPage() {
       )}
 
       {composeOpen && (
-        <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-label="Compose email">
+        <div
+          className={styles.modalOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Compose email"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) minimizeCompose();
+          }}
+        >
           <div className={styles.modal} role="document">
             <div className={styles.modalHeader}>
               <div className={styles.modalTitle}>New email</div>
@@ -762,7 +813,14 @@ export default function MailPage() {
 
             <div className={styles.modalFooter}>
               <div className={styles.modalFooterLeft}>
-                <button className={styles.secondaryButton} type="button" onClick={closeCompose}>
+                <button
+                  className={styles.secondaryButton}
+                  type="button"
+                  onClick={() => {
+                    if (isComposeDirty) setComposeCancelConfirmOpen(true);
+                    else discardCompose();
+                  }}
+                >
                   Cancel
                 </button>
                 <button
@@ -782,13 +840,7 @@ export default function MailPage() {
                     className={styles.primaryButton}
                     type="button"
                     onClick={() => {
-                      setComposeOpen(false);
-                      setComposeDraft({ to: "", subject: "", body: "" });
-                      setSavedDraft(null);
-                      setScheduleEnabled(false);
-                      setScheduledFor("");
-                      setSendMenuOpen(false);
-                      setAttachments([]);
+                      discardCompose();
                     }}
                   >
                     {scheduleEnabled ? "Schedule send" : "Send"}
@@ -812,9 +864,8 @@ export default function MailPage() {
                         type="button"
                         role="menuitem"
                         onClick={() => {
-                          setSavedDraft(composeDraft);
                           setSendMenuOpen(false);
-                          setComposeOpen(false);
+                          minimizeCompose();
                         }}
                       >
                         <span className={styles.sendMenuItemRow}>
@@ -878,6 +929,52 @@ export default function MailPage() {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {composeCancelConfirmOpen && (
+        <div
+          className={styles.confirmOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Save draft"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setComposeCancelConfirmOpen(false);
+          }}
+        >
+          <div className={styles.confirmModal} role="document">
+            <div className={styles.confirmTitle}>Save draft?</div>
+            <div className={styles.confirmBody}>You have changes in this email. Save it as a draft?</div>
+            <div className={styles.confirmActions}>
+              <button
+                type="button"
+                className={`${styles.secondaryButton} ${styles.dangerAction}`}
+                onClick={() => {
+                  setComposeCancelConfirmOpen(false);
+                  discardCompose();
+                }}
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => setComposeCancelConfirmOpen(false)}
+              >
+                Continue editing
+              </button>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => {
+                  setComposeCancelConfirmOpen(false);
+                  minimizeCompose();
+                }}
+              >
+                Save draft
+              </button>
             </div>
           </div>
         </div>
