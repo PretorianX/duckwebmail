@@ -14,16 +14,18 @@ import {
   Bold,
   ChevronDown,
   Italic,
-  Underline as UnderlineIcon,
-  Strikethrough,
   List,
   ListOrdered,
-  Quote,
   Link2,
   Link2Off,
+  MoreHorizontal,
+  Quote,
+  Redo2,
+  Strikethrough,
+  Underline as UnderlineIcon,
   ImagePlus,
   Undo2,
-  Redo2
+  XCircle
 } from "lucide-react";
 
 import styles from "./composeEditor.module.css";
@@ -105,7 +107,7 @@ const FONT_SIZES: Array<{ label: string; value: string }> = [
   { label: "32", value: "32px" }
 ];
 
-type Picker = "font" | "size" | null;
+type Picker = "font" | "size" | "more" | null;
 
 function htmlOrEmpty(editorHtml: string, editorText: string) {
   return editorText.trim() === "" ? "" : editorHtml;
@@ -245,138 +247,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
           </button>
         </div>
 
-        <span className={styles.divider} aria-hidden="true" />
-
-        <div className={styles.toolbarGroup} aria-label="Text style">
-          <button
-            type="button"
-            className={`${styles.toolButton} ${editor?.isActive("bold") ? styles.toolButtonActive : ""}`}
-            title="Bold"
-            aria-label="Bold"
-            onClick={() => editor?.chain().focus().toggleBold().run()}
-          >
-            <Bold className={styles.icon} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={`${styles.toolButton} ${editor?.isActive("italic") ? styles.toolButtonActive : ""}`}
-            title="Italic"
-            aria-label="Italic"
-            onClick={() => editor?.chain().focus().toggleItalic().run()}
-          >
-            <Italic className={styles.icon} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={`${styles.toolButton} ${editor?.isActive("underline") ? styles.toolButtonActive : ""}`}
-            title="Underline"
-            aria-label="Underline"
-            onClick={() => editor?.chain().focus().toggleUnderline().run()}
-          >
-            <UnderlineIcon className={styles.icon} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={`${styles.toolButton} ${editor?.isActive("strike") ? styles.toolButtonActive : ""}`}
-            title="Strikethrough"
-            aria-label="Strikethrough"
-            onClick={() => editor?.chain().focus().toggleStrike().run()}
-          >
-            <Strikethrough className={styles.icon} aria-hidden="true" />
-          </button>
-        </div>
-
-        <span className={styles.divider} aria-hidden="true" />
-
-        <div className={styles.toolbarGroup} aria-label="Lists">
-          <button
-            type="button"
-            className={`${styles.toolButton} ${editor?.isActive("bulletList") ? styles.toolButtonActive : ""}`}
-            title="Bullet list"
-            aria-label="Bullet list"
-            onClick={() => editor?.chain().focus().toggleBulletList().run()}
-          >
-            <List className={styles.icon} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={`${styles.toolButton} ${editor?.isActive("orderedList") ? styles.toolButtonActive : ""}`}
-            title="Numbered list"
-            aria-label="Numbered list"
-            onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-          >
-            <ListOrdered className={styles.icon} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={`${styles.toolButton} ${editor?.isActive("blockquote") ? styles.toolButtonActive : ""}`}
-            title="Quote"
-            aria-label="Quote"
-            onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-          >
-            <Quote className={styles.icon} aria-hidden="true" />
-          </button>
-        </div>
-
-        <span className={styles.divider} aria-hidden="true" />
-
-        <div className={styles.toolbarGroup} aria-label="Links and images">
-          <button
-            type="button"
-            className={`${styles.toolButton} ${editor?.isActive("link") ? styles.toolButtonActive : ""}`}
-            title="Insert link"
-            aria-label="Insert link"
-            onClick={() => {
-              if (!editor) return;
-              const prev = editor.getAttributes("link").href as string | undefined;
-              const href = window.prompt("Enter link URL", prev ?? "");
-              if (!href) return;
-              editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
-            }}
-          >
-            <Link2 className={styles.icon} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={`${styles.toolButton} ${styles.toolButtonDanger}`}
-            title="Remove link"
-            aria-label="Remove link"
-            onClick={() => editor?.chain().focus().unsetLink().run()}
-          >
-            <Link2Off className={styles.icon} aria-hidden="true" />
-          </button>
-
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file || !editor) return;
-              const reader = new FileReader();
-              reader.onload = () => {
-                const src = String(reader.result ?? "");
-                if (!src) return;
-                editor.chain().focus().setImage({ src }).run();
-              };
-              reader.readAsDataURL(file);
-              e.currentTarget.value = "";
-            }}
-          />
-
-          <button
-            type="button"
-            className={styles.toolButton}
-            title="Insert image"
-            aria-label="Insert image"
-            onClick={() => imageInputRef.current?.click()}
-          >
-            <ImagePlus className={styles.icon} aria-hidden="true" />
-          </button>
-        </div>
-
-        <span className={styles.divider} aria-hidden="true" />
+        <div className={styles.toolbarSpacer} aria-hidden="true" />
 
         <div className={styles.toolbarGroup} aria-label="History">
           <button
@@ -385,22 +256,54 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
             title="Undo"
             aria-label="Undo"
             disabled={!canUndo}
-            onClick={() => editor?.chain().focus().undo().run()}
+            onPointerDown={(e) => {
+              // Keep this from focusing the editor on mobile.
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              editor?.chain().focus().undo().run();
+            }}
           >
             <Undo2 className={styles.icon} aria-hidden="true" />
           </button>
+
           <button
             type="button"
             className={styles.toolButton}
-            title="Redo"
-            aria-label="Redo"
-            disabled={!canRedo}
-            onClick={() => editor?.chain().focus().redo().run()}
+            title="More"
+            aria-label="More formatting options"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setPicker((prev) => (prev === "more" ? null : "more"));
+            }}
           >
-            <Redo2 className={styles.icon} aria-hidden="true" />
+            <MoreHorizontal className={styles.icon} aria-hidden="true" />
           </button>
         </div>
       </div>
+
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file || !editor) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const src = String(reader.result ?? "");
+            if (!src) return;
+            editor.chain().focus().setImage({ src }).run();
+          };
+          reader.readAsDataURL(file);
+          e.currentTarget.value = "";
+        }}
+      />
 
       <div className={styles.editor} aria-label="Message body">
         <EditorContent editor={editor} />
@@ -428,7 +331,9 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
             }}
           >
             <div className={styles.sheetHeader}>
-              <div className={styles.sheetTitle}>{picker === "font" ? "Font" : "Size"}</div>
+              <div className={styles.sheetTitle}>
+                {picker === "font" ? "Font" : picker === "size" ? "Size" : "More"}
+              </div>
             </div>
 
             <div className={styles.sheetBody}>
@@ -473,7 +378,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
                     </button>
                   ))}
                 </>
-              ) : (
+              ) : picker === "size" ? (
                 <>
                   <button
                     type="button"
@@ -510,6 +415,253 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
                       <span className={styles.sheetItemText}>{s.label}</span>
                     </button>
                   ))}
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={`${styles.sheetItem} ${editor?.isActive("bold") ? styles.sheetItemActive : ""}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      editor?.chain().focus().toggleBold().run();
+                      setPicker(null);
+                    }}
+                  >
+                    <span className={styles.sheetItemRow}>
+                      <Bold className={styles.sheetItemIcon} aria-hidden="true" />
+                      <span className={styles.sheetItemText}>Bold</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.sheetItem} ${editor?.isActive("italic") ? styles.sheetItemActive : ""}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      editor?.chain().focus().toggleItalic().run();
+                      setPicker(null);
+                    }}
+                  >
+                    <span className={styles.sheetItemRow}>
+                      <Italic className={styles.sheetItemIcon} aria-hidden="true" />
+                      <span className={styles.sheetItemText}>Italic</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.sheetItem} ${editor?.isActive("underline") ? styles.sheetItemActive : ""}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      editor?.chain().focus().toggleUnderline().run();
+                      setPicker(null);
+                    }}
+                  >
+                    <span className={styles.sheetItemRow}>
+                      <UnderlineIcon className={styles.sheetItemIcon} aria-hidden="true" />
+                      <span className={styles.sheetItemText}>Underline</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.sheetItem} ${editor?.isActive("strike") ? styles.sheetItemActive : ""}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      editor?.chain().focus().toggleStrike().run();
+                      setPicker(null);
+                    }}
+                  >
+                    <span className={styles.sheetItemRow}>
+                      <Strikethrough className={styles.sheetItemIcon} aria-hidden="true" />
+                      <span className={styles.sheetItemText}>Strikethrough</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.sheetItem} ${editor?.isActive("bulletList") ? styles.sheetItemActive : ""}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      editor?.chain().focus().toggleBulletList().run();
+                      setPicker(null);
+                    }}
+                  >
+                    <span className={styles.sheetItemRow}>
+                      <List className={styles.sheetItemIcon} aria-hidden="true" />
+                      <span className={styles.sheetItemText}>Bullet list</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.sheetItem} ${editor?.isActive("orderedList") ? styles.sheetItemActive : ""}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      editor?.chain().focus().toggleOrderedList().run();
+                      setPicker(null);
+                    }}
+                  >
+                    <span className={styles.sheetItemRow}>
+                      <ListOrdered className={styles.sheetItemIcon} aria-hidden="true" />
+                      <span className={styles.sheetItemText}>Numbered list</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.sheetItem} ${editor?.isActive("blockquote") ? styles.sheetItemActive : ""}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      editor?.chain().focus().toggleBlockquote().run();
+                      setPicker(null);
+                    }}
+                  >
+                    <span className={styles.sheetItemRow}>
+                      <Quote className={styles.sheetItemIcon} aria-hidden="true" />
+                      <span className={styles.sheetItemText}>Quote</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.sheetItem} ${editor?.isActive("link") ? styles.sheetItemActive : ""}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!editor) return;
+                      const prev = editor.getAttributes("link").href as string | undefined;
+                      const href = window.prompt("Enter link URL", prev ?? "");
+                      if (!href) return;
+                      editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
+                      setPicker(null);
+                    }}
+                  >
+                    <span className={styles.sheetItemRow}>
+                      <Link2 className={styles.sheetItemIcon} aria-hidden="true" />
+                      <span className={styles.sheetItemText}>Insert link</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.sheetItem} ${styles.sheetItemDanger}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      editor?.chain().focus().unsetLink().run();
+                      setPicker(null);
+                    }}
+                  >
+                    <span className={styles.sheetItemRow}>
+                      <Link2Off className={styles.sheetItemIcon} aria-hidden="true" />
+                      <span className={styles.sheetItemText}>Remove link</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={styles.sheetItem}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPicker(null);
+                      window.requestAnimationFrame(() => imageInputRef.current?.click());
+                    }}
+                  >
+                    <span className={styles.sheetItemRow}>
+                      <ImagePlus className={styles.sheetItemIcon} aria-hidden="true" />
+                      <span className={styles.sheetItemText}>Insert image</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={styles.sheetItem}
+                    disabled={!canRedo}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      editor?.chain().focus().redo().run();
+                      setPicker(null);
+                    }}
+                  >
+                    <span className={styles.sheetItemRow}>
+                      <Redo2 className={styles.sheetItemIcon} aria-hidden="true" />
+                      <span className={styles.sheetItemText}>Redo</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.sheetItem} ${styles.sheetItemDanger}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      editor?.chain().focus().clearNodes().unsetAllMarks().run();
+                      setPicker(null);
+                    }}
+                  >
+                    <span className={styles.sheetItemRow}>
+                      <XCircle className={styles.sheetItemIcon} aria-hidden="true" />
+                      <span className={styles.sheetItemText}>Clear formatting</span>
+                    </span>
+                  </button>
                 </>
               )}
             </div>

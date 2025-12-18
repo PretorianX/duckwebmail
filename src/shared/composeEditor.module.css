@@ -7,12 +7,14 @@
 
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 10px;
   border-bottom: 1px solid var(--border-color);
   background: rgba(255, 204, 0, 0.06);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .toolbarGroup {
@@ -26,6 +28,11 @@
   height: 22px;
   background: var(--border-color);
   margin: 0 4px;
+}
+
+.toolbarSpacer {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .pickerButton {
@@ -251,4 +258,27 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sheetItemRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sheetItemIcon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  color: var(--light-text);
+}
+
+.sheetItemDanger {
+  border-color: rgba(255, 86, 86, 0.35);
+}
+
+.sheetItemDanger:hover {
+  border-color: rgba(255, 86, 86, 0.7);
+  background: rgba(255, 86, 86, 0.08);
 }
