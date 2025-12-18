@@ -84,7 +84,7 @@ describe("MailPage", () => {
     expect(screen.getByLabelText(/subject/i)).toHaveValue("Re: Invoice #1234");
 
     // Close dialog and open again via forward.
-    await user.click(screen.getByRole("button", { name: /close/i }));
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
     await user.hover(invoiceRow);
     await user.click(invoice.getByRole("button", { name: /forward invoice #1234/i }));
     expect(screen.getByRole("dialog", { name: /compose email/i })).toBeVisible();

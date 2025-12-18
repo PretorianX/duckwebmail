@@ -753,16 +753,52 @@
   outline: none;
 }
 
+.datetimeInput {
+  color-scheme: light dark;
+}
+
+.datetimeInput::-webkit-calendar-picker-indicator {
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+:global(body[data-theme="dark"]) .datetimeInput::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
 .textarea {
   resize: vertical;
 }
 
 .modalFooter {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 10px;
+  flex-wrap: nowrap;
   padding: 12px 14px;
   border-top: 1px solid var(--border-color);
+}
+
+.modalFooterLeft,
+.modalFooterRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modalFooterLeft {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.modalFooterLeft > * {
+  flex: 0 0 auto;
+}
+
+.modalFooterRight {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .secondaryButton {
@@ -772,6 +808,24 @@
   background: transparent;
   color: var(--text-color);
   font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 420px) {
+  .secondaryButton {
+    padding: 9px 10px;
+  }
+
+  .splitButton .primaryButton {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .splitToggle {
+    width: 40px;
+  }
 }
 
 .primaryButton {
@@ -781,10 +835,143 @@
   color: var(--dark-button-text, #121620);
   border: none;
   font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .primaryButton:hover {
   background: var(--duck-orange-light);
+}
+
+.splitButton {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 10px;
+  overflow: visible;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.splitButton .primaryButton {
+  border-radius: 10px 0 0 10px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.splitToggle {
+  width: 44px;
+  border: none;
+  background: var(--duck-orange);
+  color: var(--dark-button-text, #121620);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 10px 10px 0;
+  border-left: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.splitToggle:hover {
+  background: var(--duck-orange-light);
+}
+
+.sendMenu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  min-width: 220px;
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  z-index: 60;
+}
+
+.sendMenuItem {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  font-weight: 850;
+}
+
+.sendMenuItem:hover {
+  background: rgba(255, 204, 0, 0.08);
+}
+
+.sendMenuItemRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.attachmentsInput {
+  display: none;
+}
+
+.attachmentsSection {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.attachmentsHeader {
+  font-size: 0.85rem;
+  color: var(--light-text);
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+
+.attachmentChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attachmentChipCompose {
+  max-width: 100%;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 204, 0, 0.06);
+  color: var(--text-color);
+  border-radius: 999px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.attachmentChipCompose .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.attachmentChipName {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 850;
+}
+
+.attachmentRemove {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 86, 86, 0.35);
+  background: transparent;
+  color: var(--text-color);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.attachmentRemove:hover {
+  border-color: rgba(255, 86, 86, 0.7);
+  background: rgba(255, 86, 86, 0.08);
 }
 
 @media (min-width: 768px) {

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
   ChevronDown,
   ChevronRight,
+  Clock,
   Download,
   FileDown,
   Forward,
@@ -12,6 +13,7 @@ import {
   Paperclip,
   Pencil,
   Reply,
+  Save,
   Star,
   Trash2,
   X
@@ -120,8 +122,27 @@ type ComposeDraft = {
   body: string;
 };
 
+const toDatetimeLocalValue = (d: Date) => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const min = pad(d.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+};
+
+const roundToNextMinutes = (date: Date, stepMinutes: number) => {
+  const stepMs = stepMinutes * 60 * 1000;
+  const ms = date.getTime();
+  return new Date(Math.ceil(ms / stepMs) * stepMs);
+};
+
 export default function MailPage() {
   const navigate = useNavigate();
+  const sendMenuRef = useRef<HTMLDivElement | null>(null);
+  const attachmentsInputRef = useRef<HTMLInputElement | null>(null);
+  const scheduledForInputRef = useRef<HTMLInputElement | null>(null);
   const [mailboxId, setMailboxId] = useState(demoMailboxes[0].id);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [expandedAttachmentIds, setExpandedAttachmentIds] = useState<Set<string>>(() => new Set());
@@ -130,6 +151,11 @@ export default function MailPage() {
   const [composeOpen, setComposeOpen] = useState(false);
   const [mailboxPickerOpen, setMailboxPickerOpen] = useState(false);
   const [composeDraft, setComposeDraft] = useState<ComposeDraft>({ to: "", subject: "", body: "" });
+  const [savedDraft, setSavedDraft] = useState<ComposeDraft | null>(null);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState<string>("");
+  const [sendMenuOpen, setSendMenuOpen] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
   const [messages, setMessages] = useState<Message[]>(() => demoMessages);
 
   const mailbox = useMemo(() => demoMailboxes.find((m) => m.id === mailboxId)!, [mailboxId]);
@@ -145,13 +171,36 @@ export default function MailPage() {
     setMailboxPickerOpen(false);
   }, [mailboxId]);
 
+  useEffect(() => {
+    if (!sendMenuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const el = sendMenuRef.current;
+      if (!el) return;
+      if (e.target instanceof Node && el.contains(e.target)) return;
+      setSendMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [sendMenuOpen]);
+
   const openCompose = (draft?: Partial<ComposeDraft>) => {
     setComposeDraft((prev) => ({
       to: draft?.to ?? prev.to,
       subject: draft?.subject ?? prev.subject,
       body: draft?.body ?? prev.body
     }));
+    setScheduleEnabled(false);
+    setScheduledFor("");
+    setSendMenuOpen(false);
+    setAttachments([]);
     setComposeOpen(true);
+  };
+
+  const closeCompose = () => {
+    setComposeOpen(false);
+    setSendMenuOpen(false);
+    setScheduleEnabled(false);
+    setScheduledFor("");
   };
 
   const toggleExpanded = (messageId: string) => {
@@ -563,15 +612,17 @@ export default function MailPage() {
         </section>
       </section>
 
-      <button
-        type="button"
-        className={styles.fabCompose}
-        aria-label="Compose"
-        title="Compose"
-        onClick={() => openCompose({ to: "", subject: "", body: "" })}
-      >
-        <Pencil className={styles.icon} aria-hidden="true" />
-      </button>
+      {!composeOpen && (
+        <button
+          type="button"
+          className={styles.fabCompose}
+          aria-label="Compose"
+          title="Compose"
+          onClick={() => openCompose(savedDraft ?? { to: "", subject: "", body: "" })}
+        >
+          <Pencil className={styles.icon} aria-hidden="true" />
+        </button>
+      )}
 
       {mailboxPickerOpen && (
         <div
@@ -623,9 +674,6 @@ export default function MailPage() {
           <div className={styles.modal} role="document">
             <div className={styles.modalHeader}>
               <div className={styles.modalTitle}>New email</div>
-              <button className={styles.modalClose} type="button" aria-label="Close" onClick={() => setComposeOpen(false)}>
-                <X className={styles.icon} aria-hidden="true" />
-              </button>
             </div>
 
             <div className={styles.modalBody}>
@@ -649,6 +697,19 @@ export default function MailPage() {
                   onChange={(e) => setComposeDraft((prev) => ({ ...prev, subject: e.target.value }))}
                 />
               </label>
+
+              {scheduleEnabled && (
+                <label className={styles.field}>
+                  Scheduled for
+                  <input
+                    ref={scheduledForInputRef}
+                    className={`${styles.input} ${styles.datetimeInput}`}
+                    type="datetime-local"
+                    value={scheduledFor}
+                    onChange={(e) => setScheduledFor(e.target.value)}
+                  />
+                </label>
+              )}
               <label className={styles.field}>
                 Message
                 <textarea
@@ -659,22 +720,164 @@ export default function MailPage() {
                   onChange={(e) => setComposeDraft((prev) => ({ ...prev, body: e.target.value }))}
                 />
               </label>
+
+              <input
+                ref={attachmentsInputRef}
+                className={styles.attachmentsInput}
+                type="file"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  if (files.length === 0) return;
+                  setAttachments((prev) => [...prev, ...files]);
+                  e.currentTarget.value = "";
+                }}
+              />
+
+              {attachments.length > 0 && (
+                <div className={styles.attachmentsSection} aria-label="Attachments">
+                  <div className={styles.attachmentsHeader}>Attachments</div>
+                  <div className={styles.attachmentChips}>
+                    {attachments.map((f, idx) => (
+                      <div key={`${f.name}-${f.size}-${idx}`} className={styles.attachmentChipCompose}>
+                        <Paperclip className={styles.icon} aria-hidden="true" />
+                        <span className={styles.attachmentChipName} title={f.name}>
+                          {f.name}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.attachmentRemove}
+                          aria-label={`Remove ${f.name}`}
+                          title="Remove"
+                          onClick={() => setAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                        >
+                          <X className={styles.icon} aria-hidden="true" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className={styles.modalFooter}>
-              <button className={styles.secondaryButton} type="button" onClick={() => setComposeOpen(false)}>
-                Cancel
-              </button>
-              <button
-                className={styles.primaryButton}
-                type="button"
-                onClick={() => {
-                  setComposeOpen(false);
-                  setComposeDraft({ to: "", subject: "", body: "" });
-                }}
-              >
-                Send
-              </button>
+              <div className={styles.modalFooterLeft}>
+                <button className={styles.secondaryButton} type="button" onClick={closeCompose}>
+                  Cancel
+                </button>
+                <button
+                  className={styles.secondaryButton}
+                  type="button"
+                  title="Attach file"
+                  aria-label="Attach file"
+                  onClick={() => attachmentsInputRef.current?.click()}
+                >
+                  <Paperclip className={styles.icon} aria-hidden="true" />
+                </button>
+              </div>
+
+              <div className={styles.modalFooterRight}>
+                <div ref={sendMenuRef} className={styles.splitButton}>
+                  <button
+                    className={styles.primaryButton}
+                    type="button"
+                    onClick={() => {
+                      setComposeOpen(false);
+                      setComposeDraft({ to: "", subject: "", body: "" });
+                      setSavedDraft(null);
+                      setScheduleEnabled(false);
+                      setScheduledFor("");
+                      setSendMenuOpen(false);
+                      setAttachments([]);
+                    }}
+                  >
+                    {scheduleEnabled ? "Schedule send" : "Send"}
+                  </button>
+                  <button
+                    className={styles.splitToggle}
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={sendMenuOpen}
+                    aria-label="More send options"
+                    title="More send options"
+                    onClick={() => setSendMenuOpen((v) => !v)}
+                  >
+                    <ChevronDown className={styles.icon} aria-hidden="true" />
+                  </button>
+
+                  {sendMenuOpen && (
+                    <div className={styles.sendMenu} role="menu" aria-label="Send options">
+                      <button
+                        className={styles.sendMenuItem}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setSavedDraft(composeDraft);
+                          setSendMenuOpen(false);
+                          setComposeOpen(false);
+                        }}
+                      >
+                        <span className={styles.sendMenuItemRow}>
+                          <Save className={styles.icon} aria-hidden="true" />
+                          Save as draft
+                        </span>
+                      </button>
+                      {scheduleEnabled && (
+                        <button
+                          className={styles.sendMenuItem}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setScheduleEnabled(false);
+                            setScheduledFor("");
+                            setSendMenuOpen(false);
+                          }}
+                        >
+                          <span className={styles.sendMenuItemRow}>
+                            <Mail className={styles.icon} aria-hidden="true" />
+                            Send now
+                          </span>
+                        </button>
+                      )}
+                      {scheduleEnabled ? (
+                        <button
+                          className={styles.sendMenuItem}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            if (!scheduledFor) setScheduledFor(toDatetimeLocalValue(roundToNextMinutes(new Date(), 15)));
+                            setSendMenuOpen(false);
+                            // Focus the datetime input once the menu is closed.
+                            requestAnimationFrame(() => scheduledForInputRef.current?.focus());
+                          }}
+                        >
+                          <span className={styles.sendMenuItemRow}>
+                            <Clock className={styles.icon} aria-hidden="true" />
+                            Change schedule
+                          </span>
+                        </button>
+                      ) : (
+                        <button
+                          className={styles.sendMenuItem}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setScheduleEnabled(true);
+                            if (!scheduledFor) setScheduledFor(toDatetimeLocalValue(roundToNextMinutes(new Date(), 15)));
+                            setSendMenuOpen(false);
+                            requestAnimationFrame(() => scheduledForInputRef.current?.focus());
+                          }}
+                        >
+                          <span className={styles.sendMenuItemRow}>
+                            <Clock className={styles.icon} aria-hidden="true" />
+                            Schedule delivery
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
