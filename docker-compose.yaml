@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  webmail-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+

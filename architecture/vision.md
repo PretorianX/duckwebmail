@@ -1,0 +1,13 @@
+- webmail bassed on jmap protocol
+- no ads
+- emails are shown as list
+- clicking on email opens like accordeon, not redraws all dom content
+- several emails can be expanded simultaniously
+- effective caching for cases when email was expanded/closed
+- modern opensource wysiwyg should be used for compose
+- inline immages and attachments should be supported
+- theme can be selected
+- all effective space should be used on screen
+- latest design printiples should be used but this is webmail, more emails listed - better, paddings and margins should be affective
+- color palette should have primary color #ffcc00
+- webmail is about ducks, so lists etc should use 🦆
