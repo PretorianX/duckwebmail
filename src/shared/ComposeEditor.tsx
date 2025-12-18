@@ -223,6 +223,10 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               setPicker((prev) => (prev === "font" ? null : "font"));
             }}
           >
@@ -237,6 +241,10 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
             aria-expanded={picker === "size"}
             title="Font size"
             onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               setPicker((prev) => (prev === "size" ? null : "size"));
@@ -276,6 +284,10 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
             title="More"
             aria-label="More formatting options"
             onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               setPicker((prev) => (prev === "more" ? null : "more"));
