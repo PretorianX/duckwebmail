@@ -51,7 +51,17 @@ const GlobalStyle = createGlobalStyle`
 
   body {
     margin: 0;
-    font-family: 'Nunito', 'Arial', sans-serif;
+    font-family:
+      'Inter',
+      'Nunito',
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      'Helvetica Neue',
+      Arial,
+      sans-serif;
     line-height: 1.6;
     background-color: var(--background-color);
     color: var(--text-color);

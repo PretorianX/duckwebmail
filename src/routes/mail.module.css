@@ -886,6 +886,11 @@
   color: var(--light-text);
 }
 
+.fieldLabel {
+  font: inherit;
+  color: inherit;
+}
+
 .input,
 .textarea {
   width: 100%;

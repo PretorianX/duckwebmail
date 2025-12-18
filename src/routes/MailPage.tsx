@@ -22,6 +22,7 @@ import {
 import ThemeToggle from "../theme/ThemeToggle";
 import ProfileMenu from "../shared/ProfileMenu";
 import SafeEmailViewer from "../shared/SafeEmailViewer";
+import ComposeEditor from "../shared/ComposeEditor";
 import styles from "./mail.module.css";
 
 type Folder = { id: string; name: string; unread: number; parentId?: string | null };
@@ -125,7 +126,22 @@ const demoMessages: Message[] = [
 type ComposeDraft = {
   to: string;
   subject: string;
+  // HTML (rich-text) body
   body: string;
+};
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+
+const plainTextToHtml = (value: string) => {
+  const trimmed = value.trim();
+  if (trimmed === "") return "";
+  return `<p>${escapeHtml(trimmed).replaceAll("\n", "<br />")}</p>`;
 };
 
 const toDatetimeLocalValue = (d: Date) => {
@@ -257,7 +273,7 @@ export default function MailPage() {
     setComposeDraft({
       to: draft?.to ?? "",
       subject: draft?.subject ?? "",
-      body: draft?.body ?? ""
+      body: draft?.body ? plainTextToHtml(draft.body) : ""
     });
     setScheduleEnabled(false);
     setScheduledFor("");
@@ -944,16 +960,14 @@ export default function MailPage() {
                   />
                 </label>
               )}
-              <label className={styles.field}>
-                Message
-                <textarea
-                  className={styles.textarea}
-                  rows={10}
-                  placeholder="Write your message..."
-                  value={composeDraft.body}
-                  onChange={(e) => setComposeDraft((prev) => ({ ...prev, body: e.target.value }))}
+              <div className={styles.field}>
+                <div className={styles.fieldLabel}>Message</div>
+                <ComposeEditor
+                  valueHtml={composeDraft.body}
+                  onChangeHtml={(next) => setComposeDraft((prev) => ({ ...prev, body: next }))}
+                  placeholder="Write your message… (paste / drop images inline)"
                 />
-              </label>
+              </div>
 
               <input
                 ref={attachmentsInputRef}
