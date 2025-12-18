@@ -1,16 +1,19 @@
 import { useNavigate } from "react-router-dom";
 
 import ThemeToggle from "../theme/ThemeToggle";
+import ProfileMenu from "../shared/ProfileMenu";
+import { useMediaQuery } from "../shared/useMediaQuery";
 import styles from "./login.module.css";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const isMobile = useMediaQuery("(max-width: 880px)");
 
   return (
     <main className={styles.page}>
       <header className={styles.header}>
         <div className={styles.brand}>RayMap Webmail</div>
-        <ThemeToggle />
+        {isMobile ? <ProfileMenu /> : <ThemeToggle />}
       </header>
 
       <section className={styles.card}>

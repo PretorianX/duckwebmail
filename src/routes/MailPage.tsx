@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import ThemeToggle from "../theme/ThemeToggle";
+import ProfileMenu from "../shared/ProfileMenu";
 import SafeEmailViewer from "../shared/SafeEmailViewer";
 import styles from "./mail.module.css";
 
@@ -239,6 +240,7 @@ export default function MailPage() {
           </button>
           <div className={styles.sidebarActions}>
             <ThemeToggle />
+            <ProfileMenu />
           </div>
         </div>
 
@@ -306,7 +308,7 @@ export default function MailPage() {
 
           <div className={styles.topbarRight}>
             <div className={styles.topbarTools}>
-              <ThemeToggle />
+              <ProfileMenu />
             </div>
             <button className={styles.composeButton} type="button" onClick={() => openCompose({ to: "", subject: "", body: "" })}>
               Compose
