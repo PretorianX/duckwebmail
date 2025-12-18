@@ -30,10 +30,33 @@
   align-items: center;
   gap: 8px;
   color: var(--text-color);
+  border: none;
+  background: transparent;
+  padding: 6px 8px;
+  border-radius: 12px;
+  max-width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
+.brand:hover {
+  background: rgba(255, 204, 0, 0.08);
 }
 
 .brandDuck {
   filter: saturate(1.05);
+}
+
+.brandName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brandChevron {
+  color: var(--light-text);
+  flex: 0 0 auto;
 }
 
 .sidebarActions {
@@ -152,6 +175,10 @@
   text-overflow: ellipsis;
 }
 
+.mailboxSwitcher {
+  display: none;
+}
+
 .count {
   color: var(--light-text);
   font-weight: 700;
@@ -187,6 +214,10 @@
   gap: 10px;
 }
 
+.topbarTools {
+  display: none;
+}
+
 .composeButton {
   padding: 10px 14px;
   border-radius: 999px;
@@ -198,6 +229,108 @@
 
 .composeButton:hover {
   filter: brightness(1.02);
+}
+
+.fabCompose {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent-color);
+  color: #121620;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  z-index: 30;
+}
+
+.fabCompose:hover {
+  filter: brightness(1.02);
+}
+
+.fabCompose .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.sheetOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: end;
+  padding: 12px;
+  z-index: 40;
+}
+
+.sheet {
+  width: 100%;
+  max-width: 520px;
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sheetTitle {
+  font-weight: 950;
+  letter-spacing: 0.2px;
+}
+
+.sheetClose {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-color);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.sheetBody {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sheetMailboxItem {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  padding: 11px 12px;
+  border-radius: 14px;
+}
+
+.sheetMailboxItem:hover {
+  background: rgba(255, 204, 0, 0.08);
+  border-color: rgba(255, 204, 0, 0.25);
+}
+
+.sheetMailboxItemActive {
+  background: rgba(255, 204, 0, 0.16);
+  border-color: rgba(255, 204, 0, 0.35);
 }
 
 .list {
@@ -325,6 +458,82 @@
   min-width: 0;
 }
 
+.rightMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.attachmentIndicator {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  color: var(--light-text);
+  background: rgba(255, 204, 0, 0.06);
+  font-weight: 900;
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.attachmentIndicator .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.attachmentIndicatorCount {
+  font-variant-numeric: tabular-nums;
+}
+
+.attachmentsToggle {
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-color);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 900;
+}
+
+.attachmentsToggle .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.attachmentsToggle:hover {
+  border-color: rgba(255, 204, 0, 0.45);
+  background: rgba(255, 204, 0, 0.08);
+}
+
+.attachmentsToggleLabel {
+  color: var(--light-text);
+  font-weight: 900;
+}
+
+.attachmentsToggleCount {
+  min-width: 22px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 950;
+  background: var(--accent-color);
+  color: #121620;
+}
+
+.attachmentsToggleChevron {
+  color: var(--light-text);
+}
+
 .actions {
   display: inline-flex;
   align-items: center;
@@ -381,6 +590,10 @@
 }
 
 .expanded[hidden] {
+  display: none !important;
+}
+
+.attachments[hidden] {
   display: none !important;
 }
 
@@ -586,10 +799,7 @@
   }
 
   .sidebar {
-    min-height: auto;
-    position: sticky;
-    top: 0;
-    z-index: 20;
+    display: none;
   }
 
   .sidebarFooter {
@@ -598,16 +808,141 @@
 
   .topbar {
     grid-template-columns: 1fr auto;
+    padding-top: calc(10px + env(safe-area-inset-top));
   }
 
   .topbarCenter {
     display: none;
   }
 
+  .currentMailbox {
+    display: none;
+  }
+
+  .mailboxSwitcher {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--card-background);
+    color: var(--text-color);
+    font-weight: 900;
+    min-width: 0;
+    font-size: 0.95rem;
+  }
+
+  .mailboxSwitcher:hover {
+    border-color: rgba(255, 204, 0, 0.45);
+    background: rgba(255, 204, 0, 0.06);
+  }
+
+  .mailboxSwitcherDuck {
+    opacity: 0.95;
+    flex: 0 0 auto;
+  }
+
+  .mailboxSwitcherName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mailboxSwitcherChevron {
+    color: var(--light-text);
+    margin-left: auto;
+    flex: 0 0 auto;
+  }
+
+  .composeButton {
+    display: none;
+  }
+
+  .topbarTools {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .fabCompose {
+    display: inline-flex;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .list {
+    padding-bottom: calc(86px + env(safe-area-inset-bottom));
+  }
+
   .rowGrid {
-    grid-template-columns: minmax(90px, 160px) 1fr auto;
-    column-gap: 8px;
-    padding: 8px 8px;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    row-gap: 3px;
+    padding: 8px 10px;
+  }
+
+  .from {
+    grid-column: 1 / 2;
+    grid-row: 1;
+    font-size: 0.88rem;
+  }
+
+  .summary {
+    grid-column: 1 / 2;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .subject {
+    font-size: 0.9rem;
+  }
+
+  .preview {
+    font-size: 0.84rem;
+    line-height: 1.2;
+  }
+
+  .summarySep {
+    display: none;
+  }
+
+  .rightCell {
+    grid-column: 2 / 3;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .rightMeta {
+    gap: 8px;
+  }
+
+  .attachmentIndicator {
+    display: inline-flex;
+    padding: 2px 7px;
+    font-size: 0.74rem;
+  }
+
+  .attachmentsToggleLabel {
+    display: none;
+  }
+
+  .attachmentsToggle {
+    padding: 7px 9px;
+    gap: 7px;
+  }
+
+  .attachmentChip {
+    padding: 6px 9px;
+    gap: 6px;
+  }
+
+  .attachmentName {
+    max-width: 180px;
   }
 
   .date {

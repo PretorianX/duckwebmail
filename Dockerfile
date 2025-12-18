@@ -2,12 +2,8 @@ FROM node:24-alpine
 
 WORKDIR /app
 
-COPY package.json ./
-
-# No lockfile in repo yet; keep install straightforward.
-RUN npm install
-
-COPY . .
+COPY package.json package-lock.json ./
+RUN npm ci
 
 EXPOSE 8002
 

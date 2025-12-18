@@ -99,6 +99,7 @@ describe("MailPage", () => {
     await user.click(welcomeRow);
 
     expect(screen.getAllByText(/to:/i).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: /toggle attachments welcome/i }));
     expect(screen.getByRole("button", { name: /download attachment welcome\.txt/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /download source welcome/i })).toBeInTheDocument();
   });

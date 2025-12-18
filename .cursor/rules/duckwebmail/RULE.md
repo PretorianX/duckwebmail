@@ -2,6 +2,7 @@
 alwaysApply: true
 ---
 - webmail bassed on jmap protocol
+- mobile first
 - no ads
 - emails are shown as list
 - clicking on email opens like accordeon, not redraws all dom content
@@ -15,3 +16,4 @@ alwaysApply: true
 - color palette should have primary color #ffcc00
 - webmail is about ducks, so lists etc should use 🦆
 - do not create tests at the moment as we are experimenting with design
+- if you can repalce button text with glyphicon - do it, but add tooltip, use nice looking glyphicons with color palette

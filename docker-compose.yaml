@@ -7,6 +7,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8002:8002"
+    command: ["sh", "-lc", "npm ci && npm run dev -- --host 0.0.0.0 --port 8002"]
     volumes:
       - .:/app
       - /app/node_modules

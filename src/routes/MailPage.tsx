@@ -1,5 +1,21 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
+import {
+  ChevronDown,
+  ChevronRight,
+  Download,
+  FileDown,
+  Forward,
+  Mail,
+  MailOpen,
+  Paperclip,
+  Pencil,
+  Reply,
+  Star,
+  Trash2,
+  X
+} from "lucide-react";
 
 import ThemeToggle from "../theme/ThemeToggle";
 import SafeEmailViewer from "../shared/SafeEmailViewer";
@@ -107,9 +123,11 @@ export default function MailPage() {
   const navigate = useNavigate();
   const [mailboxId, setMailboxId] = useState(demoMailboxes[0].id);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  const [expandedAttachmentIds, setExpandedAttachmentIds] = useState<Set<string>>(() => new Set());
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [mailboxPickerOpen, setMailboxPickerOpen] = useState(false);
   const [composeDraft, setComposeDraft] = useState<ComposeDraft>({ to: "", subject: "", body: "" });
   const [messages, setMessages] = useState<Message[]>(() => demoMessages);
 
@@ -118,6 +136,12 @@ export default function MailPage() {
   useEffect(() => {
     // Switching mailbox should never keep old expanded state around.
     setExpandedIds(new Set());
+    setExpandedAttachmentIds(new Set());
+  }, [mailboxId]);
+
+  useEffect(() => {
+    // Always close the picker after selecting a mailbox.
+    setMailboxPickerOpen(false);
   }, [mailboxId]);
 
   const openCompose = (draft?: Partial<ComposeDraft>) => {
@@ -131,6 +155,21 @@ export default function MailPage() {
 
   const toggleExpanded = (messageId: string) => {
     setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+        setExpandedAttachmentIds((prevAttachments) => {
+          const nextAttachments = new Set(prevAttachments);
+          nextAttachments.delete(messageId);
+          return nextAttachments;
+        });
+      } else next.add(messageId);
+      return next;
+    });
+  };
+
+  const toggleAttachments = (messageId: string) => {
+    setExpandedAttachmentIds((prev) => {
       const next = new Set(prev);
       if (next.has(messageId)) next.delete(messageId);
       else next.add(messageId);
@@ -179,25 +218,25 @@ export default function MailPage() {
     URL.revokeObjectURL(url);
   };
 
-  const Icon = ({ title, children }: { title?: string; children: ReactNode }) => {
-    return (
-      <svg className={styles.icon} viewBox="0 0 24 24" role="img" aria-hidden={title ? undefined : true}>
-        {title ? <title>{title}</title> : null}
-        {children}
-      </svg>
-    );
-  };
-
   return (
     <main className={styles.shell}>
       <aside className={styles.sidebar} aria-label="Mailboxes">
         <div className={styles.brandRow}>
-          <div className={styles.brand}>
+          <button
+            type="button"
+            className={styles.brand}
+            onClick={() => setMailboxPickerOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={mailboxPickerOpen}
+            aria-controls="mailbox-picker"
+            title="Change mailbox"
+          >
             <span className={styles.brandDuck} aria-hidden="true">
               🦆
             </span>
-            Duckwebmail
-          </div>
+            <span className={styles.brandName}>{mailbox.name}</span>
+            <ChevronDown className={`${styles.icon} ${styles.brandChevron}`} aria-hidden="true" />
+          </button>
           <div className={styles.sidebarActions}>
             <ThemeToggle />
           </div>
@@ -239,6 +278,23 @@ export default function MailPage() {
             <div className={styles.currentMailbox}>
               {mailbox.name} <span className={styles.count}>({messages.length})</span>
             </div>
+
+            <button
+              type="button"
+              className={styles.mailboxSwitcher}
+              onClick={() => setMailboxPickerOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={mailboxPickerOpen}
+              aria-controls="mailbox-picker"
+              title="Change mailbox"
+            >
+              <span className={styles.mailboxSwitcherDuck} aria-hidden="true">
+                🦆
+              </span>
+              <span className={styles.mailboxSwitcherName}>{mailbox.name}</span>
+              <span className={styles.count}>({messages.length})</span>
+              <ChevronDown className={`${styles.icon} ${styles.mailboxSwitcherChevron}`} aria-hidden="true" />
+            </button>
           </div>
 
           <div className={styles.topbarCenter}>
@@ -249,6 +305,9 @@ export default function MailPage() {
           </div>
 
           <div className={styles.topbarRight}>
+            <div className={styles.topbarTools}>
+              <ThemeToggle />
+            </div>
             <button className={styles.composeButton} type="button" onClick={() => openCompose({ to: "", subject: "", body: "" })}>
               Compose
             </button>
@@ -331,12 +390,7 @@ export default function MailPage() {
                             openCompose({ to: msg.from, subject: `Re: ${msg.subject}`, body: "" });
                           }}
                         >
-                          <Icon>
-                            <path
-                              d="M10 9V5l-8 7 8 7v-4.2c6 0 9.2 2 12 6.2-1-8-5-12-12-12z"
-                              fill="currentColor"
-                            />
-                          </Icon>
+                          <Reply className={styles.icon} aria-hidden="true" />
                         </button>
 
                         <button
@@ -350,12 +404,7 @@ export default function MailPage() {
                             openCompose({ to: "", subject: `Fwd: ${msg.subject}`, body: msg.text ?? "" });
                           }}
                         >
-                          <Icon>
-                            <path
-                              d="M14 9V5l8 7-8 7v-4.2c-6 0-9.2 2-12 6.2 1-8 5-12 12-12z"
-                              fill="currentColor"
-                            />
-                          </Icon>
+                          <Forward className={styles.icon} aria-hidden="true" />
                         </button>
 
                         <button
@@ -369,14 +418,7 @@ export default function MailPage() {
                             toggleStar(msg.id);
                           }}
                         >
-                          <Icon>
-                            <path
-                              d="M12 17.3l-6.18 3.7 1.64-7.03L2 9.24l7.19-.61L12 2l2.81 6.63 7.19.61-5.46 4.73 1.64 7.03z"
-                              fill={msg.starred ? "currentColor" : "none"}
-                              stroke="currentColor"
-                              strokeWidth="1.6"
-                            />
-                          </Icon>
+                          <Star className={styles.icon} aria-hidden="true" fill={msg.starred ? "currentColor" : "none"} />
                         </button>
 
                         <button
@@ -390,23 +432,11 @@ export default function MailPage() {
                             toggleUnread(msg.id);
                           }}
                         >
-                          <Icon>
-                            {msg.unread ? (
-                              <path
-                                d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 2v.01L12 13 4 7.01V7h16z"
-                                fill="currentColor"
-                              />
-                            ) : (
-                              <path
-                                d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 2l-8 6-8-6"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.8"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            )}
-                          </Icon>
+                          {msg.unread ? (
+                            <MailOpen className={styles.icon} aria-hidden="true" />
+                          ) : (
+                            <Mail className={styles.icon} aria-hidden="true" />
+                          )}
                         </button>
 
                         <button
@@ -420,13 +450,23 @@ export default function MailPage() {
                             deleteMessage(msg.id);
                           }}
                         >
-                          <Icon>
-                            <path d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z" fill="currentColor" />
-                          </Icon>
+                          <Trash2 className={styles.icon} aria-hidden="true" />
                         </button>
                       </div>
                     ) : (
-                      <div className={styles.date}>{new Date(msg.receivedAt).toLocaleString()}</div>
+                      <div className={styles.rightMeta}>
+                        {msg.attachments.length > 0 && (
+                          <div
+                            className={styles.attachmentIndicator}
+                            aria-label={`${msg.attachments.length} attachment${msg.attachments.length === 1 ? "" : "s"}`}
+                            title={`${msg.attachments.length} attachment${msg.attachments.length === 1 ? "" : "s"}`}
+                          >
+                            <Paperclip className={styles.icon} aria-hidden="true" />
+                            <span className={styles.attachmentIndicatorCount}>{msg.attachments.length}</span>
+                          </div>
+                        )}
+                        <div className={styles.date}>{new Date(msg.receivedAt).toLocaleString()}</div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -461,22 +501,39 @@ export default function MailPage() {
                       title="Download source (.eml)"
                       onClick={() => triggerDownload(`${msg.subject}.eml`, "message/rfc822", msg.rawSource)}
                     >
-                      <Icon>
-                        <path
-                          d="M4 4h12l4 4v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm11 1v4h4"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinejoin="round"
-                        />
-                        <path d="M7 13h10M7 16h8M7 10h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                      </Icon>
+                      <FileDown className={styles.icon} aria-hidden="true" />
                     </button>
+
+                    {msg.attachments.length > 0 && (
+                      <button
+                        type="button"
+                        className={styles.attachmentsToggle}
+                        aria-label={`Toggle attachments ${msg.subject}`}
+                        aria-expanded={expandedAttachmentIds.has(msg.id)}
+                        aria-controls={`attachments-${msg.id}`}
+                        title="Toggle attachments"
+                        onClick={() => toggleAttachments(msg.id)}
+                      >
+                        <Paperclip className={styles.icon} aria-hidden="true" />
+                        <span className={styles.attachmentsToggleLabel}>Attachments</span>
+                        <span className={styles.attachmentsToggleCount}>{msg.attachments.length}</span>
+                        {expandedAttachmentIds.has(msg.id) ? (
+                          <ChevronDown className={`${styles.icon} ${styles.attachmentsToggleChevron}`} aria-hidden="true" />
+                        ) : (
+                          <ChevronRight className={`${styles.icon} ${styles.attachmentsToggleChevron}`} aria-hidden="true" />
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 {msg.attachments.length > 0 && (
-                  <div className={styles.attachments} aria-label="Attachments">
+                  <div
+                    id={`attachments-${msg.id}`}
+                    className={styles.attachments}
+                    aria-label="Attachments"
+                    hidden={!expandedAttachmentIds.has(msg.id)}
+                  >
                     {msg.attachments.map((a) => (
                       <button
                         key={a.id}
@@ -489,16 +546,7 @@ export default function MailPage() {
                         <span className={styles.attachmentName}>{a.name}</span>
                         <span className={styles.attachmentSize}>{formatBytes(a.sizeBytes)}</span>
                         <span className={styles.attachmentIcon} aria-hidden="true">
-                          <Icon>
-                            <path
-                              d="M12 3v10m0 0l4-4m-4 4l-4-4M5 17h14v4H5v-4z"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </Icon>
+                          <Download className={styles.icon} aria-hidden="true" />
                         </span>
                       </button>
                     ))}
@@ -513,13 +561,68 @@ export default function MailPage() {
         </section>
       </section>
 
+      <button
+        type="button"
+        className={styles.fabCompose}
+        aria-label="Compose"
+        title="Compose"
+        onClick={() => openCompose({ to: "", subject: "", body: "" })}
+      >
+        <Pencil className={styles.icon} aria-hidden="true" />
+      </button>
+
+      {mailboxPickerOpen && (
+        <div
+          id="mailbox-picker"
+          className={styles.sheetOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Choose mailbox"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setMailboxPickerOpen(false);
+          }}
+        >
+          <div className={styles.sheet} role="document">
+            <div className={styles.sheetHeader}>
+              <div className={styles.sheetTitle}>Mailboxes</div>
+              <button className={styles.sheetClose} type="button" aria-label="Close" onClick={() => setMailboxPickerOpen(false)}>
+                <X className={styles.icon} aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className={styles.sheetBody}>
+              {demoMailboxes.map((m) => {
+                const active = m.id === mailboxId;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`${styles.sheetMailboxItem} ${active ? styles.sheetMailboxItemActive : ""}`}
+                    onClick={() => setMailboxId(m.id)}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    <span className={styles.mailboxName}>
+                      <span className={styles.mailboxDuck} aria-hidden="true">
+                        🦆
+                      </span>{" "}
+                      {m.name}
+                    </span>
+                    {m.unread > 0 && <span className={styles.unreadPill}>{m.unread}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {composeOpen && (
         <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-label="Compose email">
           <div className={styles.modal} role="document">
             <div className={styles.modalHeader}>
               <div className={styles.modalTitle}>New email</div>
               <button className={styles.modalClose} type="button" aria-label="Close" onClick={() => setComposeOpen(false)}>
-                ×
+                <X className={styles.icon} aria-hidden="true" />
               </button>
             </div>
 

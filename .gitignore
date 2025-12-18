@@ -28,6 +28,7 @@ playwright-report/
 
 ### Cache
 .cache/
+.npm-cache/
 .eslintcache
 .stylelintcache
 
