@@ -65,14 +65,58 @@
   gap: 8px;
 }
 
-.mailboxes {
+.folders {
   padding: 8px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.folderFilterRow {
+  padding: 0 2px;
+}
+
+.folderFilterLabel {
+  width: 100%;
+  display: block;
+}
+
+.folderFilter {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--card-background);
+  color: var(--text-color);
+  outline: none;
+}
+
+.folderFilter:focus {
+  border-color: rgba(255, 204, 0, 0.65);
+  box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.18);
+}
+
+.folderTree {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.mailboxItem {
+.folderNode {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.folderChildren {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.folderItem {
   width: 100%;
   text-align: left;
   display: flex;
@@ -86,25 +130,60 @@
   border-radius: 12px;
 }
 
-.mailboxItem:hover {
+.folderItem:hover {
   background: rgba(255, 204, 0, 0.08);
   border-color: rgba(255, 204, 0, 0.25);
 }
 
-.mailboxItemActive {
+.folderItemActive {
   background: rgba(255, 204, 0, 0.16);
   border-color: rgba(255, 204, 0, 0.35);
 }
 
-.mailboxName {
+.folderLabel {
   font-weight: 800;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
-.mailboxDuck {
+.folderToggle {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--light-text);
+  flex: 0 0 auto;
+}
+
+.folderToggle:hover {
+  background: rgba(255, 204, 0, 0.08);
+  color: var(--text-color);
+}
+
+.folderTogglePlaceholder {
+  opacity: 0.55;
+}
+
+.folderToggleSpacer {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.folderDuck {
   opacity: 0.9;
+  flex: 0 0 auto;
+}
+
+.folderNameText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .unreadPill {
@@ -167,7 +246,7 @@
   min-width: 0;
 }
 
-.currentMailbox {
+.currentFolder {
   font-weight: 900;
   letter-spacing: 0.2px;
   white-space: nowrap;
@@ -175,7 +254,7 @@
   text-overflow: ellipsis;
 }
 
-.mailboxSwitcher {
+.folderSwitcher {
   display: none;
 }
 
@@ -225,13 +304,23 @@
   color: #121620;
   border: none;
   font-weight: 900;
+  position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
+  min-width: 120px;
 }
 
 .composeButton:hover {
   filter: brightness(1.02);
+}
+
+.composeButtonLabel {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 .draftPill {
@@ -246,10 +335,10 @@
   font-weight: 950;
   background: rgba(18, 22, 32, 0.18);
   color: #121620;
+  margin-left: auto;
 }
 
 .composeDock {
-  position: fixed;
   left: 14px;
   right: 14px;
   bottom: 14px;
@@ -260,6 +349,8 @@
   color: #121620;
   display: none;
   align-items: center;
+  justify-content: center;
+  position: fixed;
   gap: 10px;
   padding: 0 14px;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
@@ -276,13 +367,23 @@
   flex: 0 0 auto;
 }
 
-.composeDockText {
+.composeDockIcon {
+  position: absolute;
+  left: 16px;
+}
+
+.composeDockLabel {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   font-weight: 950;
   letter-spacing: 0.2px;
+  white-space: nowrap;
 }
 
 .composeDockDraftPill {
-  margin-left: auto;
+  position: absolute;
+  right: 16px;
   min-width: 72px;
   height: 24px;
   padding: 0 10px;
@@ -309,11 +410,14 @@
 .sheet {
   width: 100%;
   max-width: 520px;
+  max-height: 50vh;
   background: var(--card-background);
   border: 1px solid var(--border-color);
   border-radius: 18px;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
 }
 
 .sheetHeader {
@@ -346,9 +450,10 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  overflow: auto;
 }
 
-.sheetMailboxItem {
+.sheetFolderItem {
   width: 100%;
   text-align: left;
   display: flex;
@@ -362,12 +467,12 @@
   border-radius: 14px;
 }
 
-.sheetMailboxItem:hover {
+.sheetFolderItem:hover {
   background: rgba(255, 204, 0, 0.08);
   border-color: rgba(255, 204, 0, 0.25);
 }
 
-.sheetMailboxItemActive {
+.sheetFolderItemActive {
   background: rgba(255, 204, 0, 0.16);
   border-color: rgba(255, 204, 0, 0.35);
 }
@@ -1092,11 +1197,11 @@
     display: none;
   }
 
-  .currentMailbox {
+  .currentFolder {
     display: none;
   }
 
-  .mailboxSwitcher {
+  .folderSwitcher {
     width: 100%;
     display: inline-flex;
     align-items: center;
@@ -1111,24 +1216,24 @@
     font-size: 0.95rem;
   }
 
-  .mailboxSwitcher:hover {
+  .folderSwitcher:hover {
     border-color: rgba(255, 204, 0, 0.45);
     background: rgba(255, 204, 0, 0.06);
   }
 
-  .mailboxSwitcherDuck {
+  .folderSwitcherDuck {
     opacity: 0.95;
     flex: 0 0 auto;
   }
 
-  .mailboxSwitcherName {
+  .folderSwitcherName {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .mailboxSwitcherChevron {
+  .folderSwitcherChevron {
     color: var(--light-text);
     margin-left: auto;
     flex: 0 0 auto;

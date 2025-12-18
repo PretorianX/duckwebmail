@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 type Theme = "light" | "dark";
 type ThemeContextValue = { theme: Theme; toggleTheme: () => void };
@@ -49,11 +49,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const theme: Theme = isMobile ? systemTheme : manualTheme;
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     // Mobile follows the device theme; manual switching is desktop-only.
     if (isMobile) return;
     setManualTheme((prev) => (prev === "light" ? "dark" : "light"));
-  };
+  }, [isMobile]);
 
   useEffect(() => {
     document.body.dataset.theme = theme;
@@ -63,7 +63,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("theme", manualTheme);
   }, [manualTheme]);
 
-  const value = useMemo(() => ({ theme, toggleTheme }), [theme, isMobile]);
+  const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

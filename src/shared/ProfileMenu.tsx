@@ -186,7 +186,7 @@ export default function ProfileMenu() {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
-  const [profiles, setProfiles] = useState<Profile[]>(() => readProfiles());
+  const [profiles] = useState<Profile[]>(() => readProfiles());
   const [activeProfileId, setActiveProfileId] = useState<string>(() => readActiveProfileId(readProfiles()));
 
   const activeProfile = useMemo(
