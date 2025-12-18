@@ -205,7 +205,7 @@
   padding: 8px 10px 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .listHeader {
@@ -230,7 +230,7 @@
 .rowGroup {
   background: var(--card-background);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 1px 5px var(--shadow-color);
 }
@@ -247,6 +247,7 @@
   border: none;
   padding: 0;
   color: inherit;
+  cursor: pointer;
 }
 
 .row:hover {
@@ -255,26 +256,20 @@
 
 .rowGrid {
   display: grid;
-  grid-template-columns: minmax(140px, 260px) 1fr minmax(140px, 220px);
-  grid-template-rows: auto auto;
-  column-gap: 12px;
-  row-gap: 2px;
-  padding: 10px 12px;
-  align-items: baseline;
+  grid-template-columns: minmax(140px, 240px) minmax(240px, 1fr) minmax(140px, 220px);
+  column-gap: 10px;
+  padding: 8px 10px;
+  align-items: center;
 }
 
 .from {
-  grid-column: 1;
-  grid-row: 1;
-  font-weight: 850;
+  font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .subject {
-  grid-column: 2;
-  grid-row: 1;
   font-weight: 900;
   white-space: nowrap;
   overflow: hidden;
@@ -282,8 +277,6 @@
 }
 
 .date {
-  grid-column: 3;
-  grid-row: 1;
   font-size: 0.8rem;
   color: var(--light-text);
   white-space: nowrap;
@@ -291,13 +284,93 @@
 }
 
 .preview {
-  grid-column: 1 / span 3;
-  grid-row: 2;
   color: var(--light-text);
   font-size: 0.9rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.summary {
+  min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.summary > * {
+  min-width: 0;
+}
+
+.subject {
+  flex: 0 1 auto;
+}
+
+.preview {
+  flex: 1 1 auto;
+}
+
+.summarySep {
+  color: var(--light-text);
+  flex: 0 0 auto;
+}
+
+.rightCell {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.iconButton {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-color);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconButton:hover {
+  border-color: rgba(255, 204, 0, 0.45);
+  background: rgba(255, 204, 0, 0.08);
+}
+
+.iconButtonActive {
+  color: var(--duck-orange);
+  border-color: rgba(255, 204, 0, 0.45);
+}
+
+.dangerButton {
+  border-color: rgba(255, 86, 86, 0.4);
+}
+
+.dangerButton:hover {
+  border-color: rgba(255, 86, 86, 0.7);
+  background: rgba(255, 86, 86, 0.08);
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.unreadText {
+  font-weight: 950;
 }
 
 .expanded {
@@ -317,6 +390,70 @@
   gap: 10px 18px;
   font-size: 0.88rem;
   color: var(--text-color);
+}
+
+.expandedSecondRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0 2px;
+}
+
+.toLine {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.88rem;
+}
+
+.downloadRow {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attachmentChip {
+  max-width: 100%;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-color);
+  border-radius: 999px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.attachmentChip:hover {
+  border-color: rgba(255, 204, 0, 0.45);
+  background: rgba(255, 204, 0, 0.08);
+}
+
+.attachmentName {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 850;
+}
+
+.attachmentSize {
+  color: var(--light-text);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.attachmentIcon {
+  color: var(--light-text);
+  display: inline-flex;
 }
 
 .metaLabel {
@@ -468,28 +605,18 @@
   }
 
   .rowGrid {
-    grid-template-columns: 1fr auto;
-    grid-template-rows: auto auto auto;
-  }
-
-  .from {
-    grid-column: 1;
-    grid-row: 1;
+    grid-template-columns: minmax(90px, 160px) 1fr auto;
+    column-gap: 8px;
+    padding: 8px 8px;
   }
 
   .date {
-    grid-column: 2;
-    grid-row: 1;
+    display: none;
   }
 
-  .subject {
-    grid-column: 1 / span 2;
-    grid-row: 2;
-  }
-
-  .preview {
-    grid-column: 1 / span 2;
-    grid-row: 3;
+  .iconButton {
+    width: 30px;
+    height: 30px;
   }
 }
 

@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 type Theme = "light" | "dark";
 type ThemeContextValue = { theme: Theme; toggleTheme: () => void };
@@ -17,7 +18,7 @@ function getInitialTheme(): Theme {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => getInitialTheme());
 
   const toggleTheme = () => {

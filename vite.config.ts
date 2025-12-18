@@ -7,7 +7,13 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test/setupTests.ts"],
-    css: true
+    css: true,
+    pool: "threads",
+    poolOptions: {
+      threads: {
+        singleThread: true
+      }
+    }
   }
 });
 

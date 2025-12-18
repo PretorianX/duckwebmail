@@ -7,7 +7,12 @@ import tsPlugin from "@typescript-eslint/eslint-plugin";
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**"]
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "**/*.timestamp-*.mjs",
+      "**/vite.config.ts.timestamp-*.mjs"
+    ]
   },
   js.configs.recommended,
   {
@@ -18,6 +23,11 @@ export default [
         ecmaFeatures: { jsx: true },
         project: "./tsconfig.json",
         tsconfigRootDir: import.meta.dirname
+      },
+      globals: {
+        window: "readonly",
+        document: "readonly",
+        localStorage: "readonly"
       }
     },
     settings: {
@@ -35,6 +45,21 @@ export default [
       "react/react-in-jsx-scope": "off",
       "react/prop-types": "off",
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }]
+    }
+  },
+  {
+    files: ["**/*.test.{ts,tsx}", "**/src/test/**/*.{ts,tsx}"],
+    languageOptions: {
+      globals: {
+        describe: "readonly",
+        test: "readonly",
+        expect: "readonly",
+        vi: "readonly",
+        beforeAll: "readonly",
+        afterAll: "readonly",
+        beforeEach: "readonly",
+        afterEach: "readonly"
+      }
     }
   }
 ];

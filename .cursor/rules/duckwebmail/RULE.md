@@ -1,3 +1,6 @@
+---
+alwaysApply: true
+---
 - webmail bassed on jmap protocol
 - no ads
 - emails are shown as list
