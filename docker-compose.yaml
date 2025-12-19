@@ -11,13 +11,25 @@ services:
       - /app/node_modules
 
   stalwart-certgen:
-    image: alpine/openssl:latest
+    image: alpine:latest
     command:
-      [
-        "sh",
-        "-lc",
-        "set -euo pipefail; mkdir -p /out/certs; if [ ! -f /out/certs/tls.crt ] || [ ! -f /out/certs/tls.key ]; then openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -keyout /out/certs/tls.key -out /out/certs/tls.crt -subj \"/CN=localhost\"; fi",
-      ]
+      - sh
+      - -c
+      - |
+        set -eu
+        apk add --no-cache openssl
+        mkdir -p /out/certs
+        if [ ! -s /out/certs/tls.crt ] || [ ! -s /out/certs/tls.key ]; then
+          echo "Generating self-signed TLS cert..."
+          openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -batch -sha256 \
+            -subj "/CN=localhost" \
+            -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" \
+            -keyout /out/certs/tls.key \
+            -out /out/certs/tls.crt
+        else
+          echo "TLS cert already exists, skipping."
+        fi
+        ls -la /out/certs/
     volumes:
       - ./stalwart-data:/out
     restart: "no"
@@ -25,21 +37,22 @@ services:
   stalwart-mail:
     image: stalwartlabs/stalwart:latest
     depends_on:
-      - stalwart-certgen
+      stalwart-certgen:
+        condition: service_completed_successfully
     environment:
       # Used by stalwart/etc/config.toml
       STALWART_PATH: /opt/stalwart
       ADMIN_SECRET: admin
     ports:
       # SMTP (public)
-      - "0.0.0.0:25:25"
+      - "0.0.0.0:1025:25"
       # SMTP submission (public)
-      - "0.0.0.0:587:587"
+      - "0.0.0.0:10587:587"
       # IMAP / IMAPS
-      - "143:143"
-      - "993:993"
+      - "10143:143"
+      - "10193:993"
       # JMAP over HTTPS
-      - "443:443"
+      - "10443:443"
       # Admin UI + API (HTTP)
       - "8080:8080"
     volumes:
