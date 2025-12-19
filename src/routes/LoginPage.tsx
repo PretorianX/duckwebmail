@@ -49,8 +49,16 @@ export default function LoginPage() {
           {error && <div className={styles.error}>{error}</div>}
 
           <label className={styles.label}>
-            Email
-            <input className={styles.input} type="email" name="email" autoComplete="email" required />
+            Email / Username
+            <input
+              className={styles.input}
+              type="text"
+              name="email"
+              autoComplete="username"
+              inputMode="email"
+              placeholder='e.g. "test" (or "test@domain.ote")'
+              required
+            />
           </label>
 
           <label className={styles.label}>

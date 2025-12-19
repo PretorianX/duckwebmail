@@ -20,15 +20,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthState | null>(null);
 
   const signIn = async (email: string, password: string) => {
-    const authHeader = "Basic " + btoa(`${email}:${password}`);
+    // Use the identifier as entered (some Stalwart setups authenticate by full email address).
+    const identifier = email.trim();
+    const authHeader = "Basic " + btoa(`${identifier}:${password}`);
 
-    const response = await fetch("/.well-known/jmap", {
+    // Stalwart redirects `/.well-known/jmap` -> `/jmap/session` (307).
+    // Some clients can mishandle auth headers across redirects, so request `/jmap/session` directly.
+    const response = await fetch("/jmap/session", {
       headers: { Authorization: authHeader }
     });
 
     if (!response.ok) {
       if (response.status === 401) {
-        throw new Error("Invalid email or password");
+        throw new Error(
+          'Invalid username/email or password. For local Stalwart dev, try "admin" / "admin" or "test@domain.ote" / "111".'
+        );
       }
       throw new Error(`Authentication failed: ${response.status} ${response.statusText}`);
     }
@@ -38,6 +44,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!session.apiUrl) {
       throw new Error("Invalid JMAP session: missing apiUrl");
+    }
+
+    // If we got a public (unauthenticated) session, Stalwart returns no accounts.
+    if (!session.accounts || Object.keys(session.accounts).length === 0) {
+      throw new Error(
+        'Authenticated session contains no accounts. If you are running locally, try "admin" / "admin" or create a mailbox user in the Stalwart admin UI on `http://localhost:8080`.'
+      );
     }
 
     const accountId = getPrimaryMailAccountId(session);
