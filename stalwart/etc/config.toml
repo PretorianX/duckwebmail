@@ -1,0 +1,75 @@
+# Stalwart Mail Server (dev) configuration for duckwebmail
+# - JMAP (HTTPS): 443
+# - Admin UI + API (HTTP): 8080
+# - SMTP: 25
+# - SMTP submission (STARTTLS): 587
+# - IMAP: 143
+# - IMAPS: 993
+#
+# Data is persisted under /opt/stalwart (mounted from ./stalwart-data)
+# TLS keys are read from /opt/stalwart/certs (self-signed for now).
+
+[server.listener."http-admin"]
+bind = ["[::]:8080"]
+protocol = "http"
+
+[server.listener."https"]
+bind = ["[::]:443"]
+protocol = "http"
+tls.implicit = true
+tls.certificate = "default"
+
+[server.listener."smtp"]
+bind = ["[::]:25"]
+protocol = "smtp"
+tls.certificate = "default"
+
+[server.listener."submission"]
+bind = ["[::]:587"]
+protocol = "smtp"
+tls.certificate = "default"
+
+[server.listener."imap"]
+bind = ["[::]:143"]
+protocol = "imap"
+
+[server.listener."imaps"]
+bind = ["[::]:993"]
+protocol = "imap"
+tls.implicit = true
+tls.certificate = "default"
+
+# TLS certificate used when SNI is absent, and as the named certificate above.
+[certificate."default"]
+cert = "%{file:/opt/stalwart/certs/tls.crt}%"
+private-key = "%{file:/opt/stalwart/certs/tls.key}%"
+default = true
+
+# Minimal storage setup (RocksDB) persisted inside /opt/stalwart/data
+[storage]
+data = "rocksdb"
+fts = "rocksdb"
+blob = "rocksdb"
+lookup = "rocksdb"
+directory = "internal"
+
+[store."rocksdb"]
+type = "rocksdb"
+path = "%{env:STALWART_PATH}%/data"
+compression = "lz4"
+
+[directory."internal"]
+type = "internal"
+store = "rocksdb"
+
+# Bootstrap admin user for initial setup.
+# Change ADMIN_SECRET in docker-compose (and ideally disable this account later).
+[authentication.fallback-admin]
+user = "admin"
+secret = "%{env:ADMIN_SECRET}%"
+
+[tracer."stdout"]
+type = "stdout"
+level = "info"
+ansi = true
+enable = true

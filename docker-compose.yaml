@@ -10,4 +10,43 @@ services:
       - .:/app
       - /app/node_modules
 
+  stalwart-certgen:
+    image: alpine/openssl:latest
+    command:
+      [
+        "sh",
+        "-lc",
+        "set -euo pipefail; mkdir -p /out/certs; if [ ! -f /out/certs/tls.crt ] || [ ! -f /out/certs/tls.key ]; then openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -keyout /out/certs/tls.key -out /out/certs/tls.crt -subj \"/CN=localhost\"; fi",
+      ]
+    volumes:
+      - ./stalwart-data:/out
+    restart: "no"
+
+  stalwart-mail:
+    image: stalwartlabs/stalwart:latest
+    depends_on:
+      - stalwart-certgen
+    environment:
+      # Used by stalwart/etc/config.toml
+      STALWART_PATH: /opt/stalwart
+      ADMIN_SECRET: admin
+    ports:
+      # SMTP (public)
+      - "0.0.0.0:25:25"
+      # SMTP submission (public)
+      - "0.0.0.0:587:587"
+      # IMAP / IMAPS
+      - "143:143"
+      - "993:993"
+      # JMAP over HTTPS
+      - "443:443"
+      # Admin UI + API (HTTP)
+      - "8080:8080"
+    volumes:
+      # Persistent data (RocksDB, queue, certs, etc.)
+      - ./stalwart-data:/opt/stalwart
+      # Committed config for local/dev
+      - ./stalwart/etc/config.toml:/opt/stalwart/etc/config.toml:ro
+    restart: unless-stopped
+
 
