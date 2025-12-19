@@ -30,7 +30,7 @@ import { useAuth } from "../auth/AuthContext";
 import { getPrimarySubmissionAccountId } from "../jmap/normalizeSession";
 import { createMailbox, deleteMailbox, getMailboxes, moveMailbox, renameMailbox, type JmapMailbox } from "../jmap/mailbox";
 import { formatQuotaBytes, getQuotas, type JmapQuota } from "../jmap/quota";
-import { getDraftsMailboxId, getOrCreateIdentity, sendEmailSubmission, upsertDraftEmail } from "../jmap/compose";
+import { getDraftsMailboxId, getOrCreateIdentity, getSentMailboxId, sendEmailSubmission, upsertDraftEmail } from "../jmap/compose";
 import {
   clearEmailListCacheForAccount,
   destroyEmail,
@@ -69,7 +69,7 @@ type Message = {
   starred: boolean;
   hasAttachments: boolean;
   attachments: Attachment[];
-  rawSource: string;
+  blobId: string | null;
   html?: string;
   text?: string;
 };
@@ -145,7 +145,7 @@ function toMessage(email: JmapEmailSummary): Message {
     starred: isStarred(email.keywords),
     hasAttachments: !!email.hasAttachment,
     attachments: [],
-    rawSource: ""
+    blobId: (email.blobId ?? "").trim() ? String(email.blobId) : null
   };
 }
 
@@ -272,6 +272,7 @@ export default function MailPage() {
   const [scheduledFor, setScheduledFor] = useState<string>("");
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [inlineImagesByCid, setInlineImagesByCid] = useState<Record<string, File>>({});
   const [messages, setMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messagesError, setMessagesError] = useState<string | null>(null);
@@ -964,6 +965,7 @@ export default function MailPage() {
     setSendMenuOpen(false);
     setComposeCancelConfirmOpen(false);
     setAttachments([]);
+    setInlineImagesByCid({});
     setComposeMinimized(false);
     setComposeOpen(true);
   };
@@ -996,6 +998,20 @@ export default function MailPage() {
     setScheduleEnabled(false);
     setScheduledFor("");
     setAttachments([]);
+    setInlineImagesByCid({});
+  };
+
+  const inlineImagesForCurrentHtml = (): Array<{ cid: string; file: File }> => {
+    // Only upload images that are still referenced in the current editor HTML.
+    const html = composeDraft.body || "";
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const cids = Array.from(doc.querySelectorAll("img[data-cid]"))
+      .map((img) => img.getAttribute("data-cid"))
+      .filter((cid): cid is string => typeof cid === "string" && cid.trim() !== "");
+    const unique = Array.from(new Set(cids));
+    return unique
+      .map((cid) => ({ cid, file: inlineImagesByCid[cid] }))
+      .filter((x): x is { cid: string; file: File } => x.file instanceof File);
   };
 
   const saveDraftToServer = async () => {
@@ -1020,6 +1036,7 @@ export default function MailPage() {
         subject: composeDraft.subject,
         htmlBody: composeDraft.body,
         attachments,
+        inlineImages: inlineImagesForCurrentHtml(),
         emailId: composeDraftEmailId
       });
 
@@ -1063,6 +1080,10 @@ export default function MailPage() {
         mailboxes.find((m) => (m.role ?? "").toLowerCase() === "drafts")?.id ??
         (await getDraftsMailboxId({ apiUrl: auth.session.apiUrl, authHeader: auth.authHeader, accountId: auth.accountId }));
 
+      const sentId =
+        mailboxes.find((m) => (m.role ?? "").toLowerCase() === "sent")?.id ??
+        (await getSentMailboxId({ apiUrl: auth.session.apiUrl, authHeader: auth.authHeader, accountId: auth.accountId }));
+
       const identity = await getOrCreateIdentity({
         apiUrl: auth.session.apiUrl,
         authHeader: auth.authHeader,
@@ -1083,6 +1104,7 @@ export default function MailPage() {
         subject: composeDraft.subject,
         htmlBody: composeDraft.body,
         attachments,
+        inlineImages: inlineImagesForCurrentHtml(),
         emailId: composeDraftEmailId
       });
 
@@ -1098,6 +1120,8 @@ export default function MailPage() {
         accountId: submissionAccountId,
         identity,
         emailId,
+        draftsMailboxId: draftsId,
+        sentMailboxId: sentId,
         to: composeDraft.to,
         cc: composeDraft.cc,
         bcc: composeDraft.bcc,
@@ -1145,8 +1169,11 @@ export default function MailPage() {
           accountId: auth.accountId,
           emailId: messageId
         });
+        const resolved = body.html
+          ? await resolveCidImagesToObjectUrls(body.html, body.bodyStructure)
+          : { html: body.html ?? "", objectUrls: [] };
         setMessages((prev) =>
-          prev.map((m) => (m.id === messageId ? { ...m, html: body.html ?? m.html, text: body.text ?? m.text } : m))
+          prev.map((m) => (m.id === messageId ? { ...m, html: resolved.html || m.html, text: body.text ?? m.text } : m))
         );
       } catch (err) {
         setBodyErrors((prev) => ({ ...prev, [messageId]: err instanceof Error ? err.message : "Failed to load message body" }));
@@ -1341,6 +1368,135 @@ export default function MailPage() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const triggerBlobDownload = (filename: string, blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const sanitizeFilename = (value: string) => {
+    const trimmed = value.trim();
+    const safe = (trimmed || "message").replace(/[\/\\?%*:|"<>]/g, "_");
+    return safe.length > 180 ? safe.slice(0, 180) : safe;
+  };
+
+  const buildJmapDownloadUrl = (template: string, params: { accountId: string; blobId: string; name: string; type: string }) => {
+    // Template typically: /jmap/download/{accountId}/{blobId}/{name}?type={type}
+    return template
+      .replaceAll("{accountId}", encodeURIComponent(params.accountId))
+      .replaceAll("{blobId}", encodeURIComponent(params.blobId))
+      .replaceAll("{name}", encodeURIComponent(params.name))
+      .replaceAll("{type}", encodeURIComponent(params.type));
+  };
+
+  const resolveCidImagesToObjectUrls = async (
+    html: string,
+    bodyStructure: unknown | undefined
+  ): Promise<{ html: string; objectUrls: string[] }> => {
+    if (!auth) return { html, objectUrls: [] };
+    if (!html || html.trim() === "") return { html, objectUrls: [] };
+
+    type Part = {
+      blobId?: string;
+      cid?: string;
+      type?: string;
+      name?: string;
+      subParts?: Part[];
+    };
+
+    const normalizeCid = (cid: string) => cid.trim().replace(/^<|>$/g, "");
+
+    const cidToPart = new Map<string, Part>();
+    const walk = (p: Part | undefined) => {
+      if (!p) return;
+      if (typeof p.cid === "string" && typeof p.blobId === "string") {
+        const k = normalizeCid(p.cid);
+        if (k) cidToPart.set(k, p);
+      }
+      for (const sp of p.subParts ?? []) walk(sp);
+    };
+    walk(bodyStructure as Part | undefined);
+
+    if (cidToPart.size === 0) return { html, objectUrls: [] };
+
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const imgs = Array.from(doc.querySelectorAll("img"));
+
+    const objectUrls: string[] = [];
+    const cidInUse = new Map<string, HTMLImageElement[]>();
+
+    for (const img of imgs) {
+      const src = img.getAttribute("src") ?? "";
+      if (!src.toLowerCase().startsWith("cid:")) continue;
+      const cid = normalizeCid(src.slice(4));
+      if (!cid) continue;
+      const list = cidInUse.get(cid) ?? [];
+      list.push(img);
+      cidInUse.set(cid, list);
+    }
+
+    for (const [cid, targets] of cidInUse.entries()) {
+      const part = cidToPart.get(cid);
+      if (!part?.blobId) continue;
+      const type = typeof part.type === "string" && part.type.trim() ? part.type : "application/octet-stream";
+      const name =
+        typeof part.name === "string" && part.name.trim()
+          ? part.name
+          : type.startsWith("image/")
+            ? `inline-${cid}.${type.split("/")[1] ?? "img"}`
+            : `inline-${cid}`;
+      const url = buildJmapDownloadUrl(auth.session.downloadUrl, {
+        accountId: auth.accountId,
+        blobId: part.blobId,
+        name,
+        type
+      });
+
+      const res = await fetch(url, { headers: { Authorization: auth.authHeader } });
+      if (!res.ok) continue;
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      objectUrls.push(objectUrl);
+      for (const img of targets) img.setAttribute("src", objectUrl);
+    }
+
+    return { html: doc.body.innerHTML, objectUrls };
+  };
+
+  const downloadEml = async (m: Message) => {
+    if (!auth) return;
+    if (!m.blobId) return;
+    const filename = `${sanitizeFilename(m.subject)}.eml`;
+    const url = buildJmapDownloadUrl(auth.session.downloadUrl, {
+      accountId: auth.accountId,
+      blobId: m.blobId,
+      name: filename,
+      type: "message/rfc822"
+    });
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: auth.authHeader
+        }
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
+      const blob = await res.blob();
+      triggerBlobDownload(filename, blob);
+    } catch (e) {
+      console.error("[EmlDownload] failed:", e);
+      alert("Failed to download .eml. Please try again.");
+    }
   };
 
   return (
@@ -1808,7 +1964,9 @@ export default function MailPage() {
                     {bodyErrors[msg.id]}
                   </div>
                 ) : (
-                  <SafeEmailViewer htmlContent={msg.html ?? ""} textContent={msg.text ?? ""} />
+                  <div className={styles.emailBody}>
+                    <SafeEmailViewer htmlContent={msg.html ?? ""} textContent={msg.text ?? ""} />
+                  </div>
                 )}
               </div>
             </div>
@@ -1935,21 +2093,21 @@ export default function MailPage() {
                 </span>
               </button>
 
-              {rowActionsMessage.rawSource.trim() !== "" && (
-                <button
-                  className={styles.sendMenuItem}
-                  type="button"
-                  onClick={() => {
-                    triggerDownload(`${rowActionsMessage.subject}.eml`, "message/rfc822", rowActionsMessage.rawSource);
-                    setRowActionsMessageId(null);
-                  }}
-                >
-                  <span className={styles.sendMenuItemRow}>
-                    <FileDown className={styles.icon} aria-hidden="true" />
-                    Download source (.eml)
-                  </span>
-                </button>
-              )}
+              <button
+                className={styles.sendMenuItem}
+                type="button"
+                title={!rowActionsMessage.blobId ? "Source unavailable" : "Download as .eml"}
+                disabled={!auth || !rowActionsMessage.blobId}
+                onClick={() => {
+                  void downloadEml(rowActionsMessage);
+                  setRowActionsMessageId(null);
+                }}
+              >
+                <span className={styles.sendMenuItemRow}>
+                  <FileDown className={styles.icon} aria-hidden="true" />
+                  Download source (.eml)
+                </span>
+              </button>
 
               <button
                 className={styles.sendMenuItem}
@@ -2458,6 +2616,7 @@ export default function MailPage() {
                 <ComposeEditor
                   valueHtml={composeDraft.body}
                   onChangeHtml={(next) => setComposeDraft((prev) => ({ ...prev, body: next }))}
+                  onInlineImage={({ cid, file }) => setInlineImagesByCid((prev) => ({ ...prev, [cid]: file }))}
                   placeholder="Write your message… (paste / drop images inline)"
                 />
               </div>

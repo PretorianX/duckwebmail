@@ -21,10 +21,16 @@ export interface JmapEmailBodyPart {
   charset?: string;
   disposition?: string;
   cid?: string;
+  subParts?: JmapEmailBodyPart[];
 }
 
 export interface JmapEmailSummary {
   id: string;
+  /**
+   * Blob id of the whole message in RFC822 form.
+   * Can be used with the JMAP download URL template to download `.eml`.
+   */
+  blobId?: string;
   subject?: string;
   from?: JmapEmailAddress[];
   to?: JmapEmailAddress[];
@@ -38,6 +44,7 @@ export interface JmapEmailFull extends JmapEmailSummary {
   htmlBody?: JmapEmailBodyPart[];
   textBody?: JmapEmailBodyPart[];
   bodyValues?: Record<string, JmapEmailBodyValue>;
+  bodyStructure?: JmapEmailBodyPart;
 }
 
 interface EmailQueryResponse {
@@ -102,6 +109,7 @@ type BodyCacheEntry = {
   key: string;
   html?: string;
   text?: string;
+  bodyStructure?: JmapEmailBodyPart;
   fetchedAtMs: number;
 };
 
@@ -142,7 +150,7 @@ export async function listEmailSummariesInMailbox(params: {
       "Email/get",
       {
         accountId: params.accountId,
-        properties: ["id", "subject", "from", "to", "receivedAt", "preview", "keywords", "hasAttachment"],
+        properties: ["id", "blobId", "subject", "from", "to", "receivedAt", "preview", "keywords", "hasAttachment"],
         "#ids": { resultOf: queryCallId, name: "Email/query", path: "/ids" }
       },
       getCallId
@@ -188,12 +196,12 @@ export async function getEmailBody(params: {
   accountId: string;
   emailId: string;
   force?: boolean;
-}): Promise<{ html?: string; text?: string }> {
+}): Promise<{ html?: string; text?: string; bodyStructure?: JmapEmailBodyPart }> {
   const cacheKey = `${params.apiUrl}|${params.accountId}|${params.emailId}`;
 
   if (!params.force) {
     const cached = emailBodyCache.get(cacheKey);
-    if (cached) return { html: cached.html, text: cached.text };
+    if (cached) return { html: cached.html, text: cached.text, bodyStructure: cached.bodyStructure };
   }
 
   const callId = generateCallId("body");
@@ -203,7 +211,7 @@ export async function getEmailBody(params: {
       {
         accountId: params.accountId,
         ids: [params.emailId],
-        properties: ["id", "htmlBody", "textBody", "bodyValues"],
+        properties: ["id", "htmlBody", "textBody", "bodyValues", "bodyStructure"],
         fetchTextBodyValues: true,
         fetchHTMLBodyValues: true,
         maxBodyValueBytes: 1024 * 512
@@ -222,8 +230,9 @@ export async function getEmailBody(params: {
   if (!email) throw new Error("Email/get returned no email");
 
   const body = pickFirstBodyValue(email);
-  emailBodyCache.set(cacheKey, { key: cacheKey, html: body.html, text: body.text, fetchedAtMs: Date.now() });
-  return body;
+  const out = { ...body, bodyStructure: email.bodyStructure };
+  emailBodyCache.set(cacheKey, { key: cacheKey, html: body.html, text: body.text, bodyStructure: email.bodyStructure, fetchedAtMs: Date.now() });
+  return out;
 }
 
 export function formatAddressList(value: JmapEmailAddress[] | undefined): string {

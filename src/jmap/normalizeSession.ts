@@ -33,6 +33,13 @@ function toPathOnly(url: string): string {
   }
 }
 
+function toPathOnlyPreserveTemplate(url: string): string {
+  // JMAP upload/download URLs are often URI templates containing `{...}` placeholders.
+  // Using URL() will percent-encode `{` and `}` into `%7B`/`%7D`, breaking later substitution.
+  const pathOnly = toPathOnly(url);
+  return pathOnly.replace(/%7B/gi, "{").replace(/%7D/gi, "}");
+}
+
 /**
  * Extract WebSocket URL from JMAP session.
  * Stalwart puts it in capabilities["urn:ietf:params:jmap:websocket"].url
@@ -61,8 +68,8 @@ export function normalizeSession(session: JmapSession): JmapSession {
   return {
     ...session,
     apiUrl: toPathOnly(session.apiUrl),
-    downloadUrl: toPathOnly(session.downloadUrl),
-    uploadUrl: toPathOnly(session.uploadUrl),
+    downloadUrl: toPathOnlyPreserveTemplate(session.downloadUrl),
+    uploadUrl: toPathOnlyPreserveTemplate(session.uploadUrl),
     eventSourceUrl: session.eventSourceUrl ? toPathOnly(session.eventSourceUrl) : undefined,
     webSocketUrl: webSocketUrl ? toPathOnly(webSocketUrl) : undefined
   };

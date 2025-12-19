@@ -8,12 +8,16 @@ export type EmailAddress = { name?: string | null; email: string };
 
 export type UploadedBlob = { blobId: string; type?: string; size?: number; name?: string };
 
+export type InlineImage = { cid: string; file: File };
+
 export type Identity = { id: string; name?: string | null; email: string };
 
 type EmailBodyValue = { value: string; isTruncated?: boolean; isEncodingProblem?: boolean };
 
 type EmailBodyPart = {
-  partId: string;
+  // For leaf parts, servers use partId to reference bodyValues.
+  // For multipart container parts, some servers (e.g. Stalwart) reject specifying partId/blobId.
+  partId?: string;
   blobId?: string;
   size?: number;
   name?: string;
@@ -234,6 +238,23 @@ export async function getDraftsMailboxId(params: {
   throw new Error('No Drafts mailbox found (role "drafts")');
 }
 
+export async function getSentMailboxId(params: {
+  apiUrl: string;
+  authHeader: string;
+  accountId: string;
+}): Promise<string> {
+  const { mailboxes } = await getMailboxes({
+    apiUrl: params.apiUrl,
+    authHeader: params.authHeader,
+    accountId: params.accountId
+  });
+  const sent = mailboxes.find((m) => (m.role ?? "").toLowerCase() === "sent");
+  if (sent?.id) return sent.id;
+  const byName = mailboxes.find((m) => m.name.trim().toLowerCase() === "sent");
+  if (byName?.id) return byName.id;
+  throw new Error('No Sent mailbox found (role "sent")');
+}
+
 export function parseEmailList(input: string): string[] {
   const raw = input
     .split(/[;,]/g)
@@ -253,37 +274,87 @@ function toAddressList(emails: string[]): EmailAddress[] {
   return emails.map((email) => ({ email }));
 }
 
+function normalizeLeafMimeType(mimeType: string | undefined): string {
+  const t = (mimeType ?? "").trim();
+  if (t === "") return "application/octet-stream";
+  // RFC 8621: multipart/* body parts are containers and MUST NOT have blobId/partId.
+  // Some browsers report `.mhtml` as `multipart/related`, so treat it as an opaque attachment.
+  if (t.toLowerCase().startsWith("multipart/")) return "application/octet-stream";
+  return t;
+}
+
+function rewriteInlineImagesToCid(html: string, allowedCids: Set<string>): string {
+  // We store inline images in the editor as <img src="blob:..." data-cid="...">.
+  // For email, rewrite them to <img src="cid:..."> and drop the editor-only attribute.
+  const doc = new DOMParser().parseFromString(html || "", "text/html");
+  const imgs = Array.from(doc.querySelectorAll("img[data-cid]"));
+  for (const img of imgs) {
+    const cid = img.getAttribute("data-cid") ?? "";
+    if (!cid || !allowedCids.has(cid)) continue;
+    img.setAttribute("src", `cid:${cid}`);
+    img.removeAttribute("data-cid");
+  }
+  return doc.body.innerHTML;
+}
+
 function buildBodyStructure(params: {
   htmlBody: string;
   attachments: UploadedBlob[];
+  inlineImages: Array<UploadedBlob & { cid: string }>;
 }): { bodyStructure: EmailBodyPart; bodyValues: Record<string, EmailBodyValue> } {
   const htmlPartId = "1";
   // Stalwart validates that you MUST NOT specify a charset when providing a `partId`
   // with inlined `bodyValues` (it considers the charset implicit/derived).
-  const htmlPart: EmailBodyPart = { partId: htmlPartId, type: "text/html" };
-  const bodyValues: Record<string, EmailBodyValue> = { [htmlPartId]: { value: params.htmlBody || "" } };
+  const allowedInlineCids = new Set(params.inlineImages.map((i) => i.cid).filter(Boolean));
+  const htmlBody = allowedInlineCids.size > 0 ? rewriteInlineImagesToCid(params.htmlBody, allowedInlineCids) : (params.htmlBody || "");
 
-  if (params.attachments.length === 0) {
-    return { bodyStructure: htmlPart, bodyValues };
-  }
+  const htmlPart: EmailBodyPart = { partId: htmlPartId, type: "text/html" };
+  const bodyValues: Record<string, EmailBodyValue> = { [htmlPartId]: { value: htmlBody } };
+
+  const inlineParts: EmailBodyPart[] = params.inlineImages.map((img) => ({
+    blobId: img.blobId,
+    type: normalizeLeafMimeType(img.type) || "application/octet-stream",
+    name: img.name,
+    disposition: "inline",
+    cid: img.cid,
+    size: img.size
+  }));
 
   const attachmentParts: EmailBodyPart[] = params.attachments.map((a, idx) => ({
-    partId: `a${idx + 1}`,
     blobId: a.blobId,
-    type: a.type || "application/octet-stream",
+    type: normalizeLeafMimeType(a.type) || "application/octet-stream",
     name: a.name,
     disposition: "attachment",
     size: a.size
   }));
 
-  return {
-    bodyStructure: {
-      partId: "root",
-      type: "multipart/mixed",
-      subParts: [htmlPart, ...attachmentParts]
-    },
-    bodyValues
-  };
+  // No inline images and no attachments -> simple HTML part.
+  if (inlineParts.length === 0 && attachmentParts.length === 0) {
+    return { bodyStructure: htmlPart, bodyValues };
+  }
+
+  // Inline images present -> wrap the HTML + inline parts into multipart/related.
+  const related: EmailBodyPart =
+    inlineParts.length > 0
+      ? {
+          type: "multipart/related",
+          subParts: [htmlPart, ...inlineParts]
+        }
+      : htmlPart;
+
+  // Attachments present -> wrap everything into multipart/mixed.
+  if (attachmentParts.length > 0) {
+    return {
+      bodyStructure: {
+        type: "multipart/mixed",
+        subParts: [related, ...attachmentParts]
+      },
+      bodyValues
+    };
+  }
+
+  // Inline images only -> multipart/related.
+  return { bodyStructure: related, bodyValues };
 }
 
 export async function upsertDraftEmail(params: {
@@ -298,6 +369,7 @@ export async function upsertDraftEmail(params: {
   subject: string;
   htmlBody: string;
   attachments: File[];
+  inlineImages?: InlineImage[];
   emailId?: string | null;
 }): Promise<{ emailId: string }> {
   const toEmails = parseEmailList(params.to);
@@ -305,13 +377,22 @@ export async function upsertDraftEmail(params: {
   const bccEmails = parseEmailList(params.bcc ?? "");
   const fromEmail = params.from.trim();
   if (fromEmail === "") throw new Error("From address is required");
+
+  const uploadedInlineImages = await Promise.all(
+    (params.inlineImages ?? []).map(async ({ cid, file }) => {
+      const uploaded = await uploadBlob({ session: params.session, authHeader: params.authHeader, accountId: params.accountId, file });
+      return { ...uploaded, cid };
+    })
+  );
+
   const { bodyStructure, bodyValues } = buildBodyStructure({
     htmlBody: params.htmlBody,
     attachments: await Promise.all(
       params.attachments.map((file) =>
         uploadBlob({ session: params.session, authHeader: params.authHeader, accountId: params.accountId, file })
       )
-    )
+    ),
+    inlineImages: uploadedInlineImages
   });
 
   const from: EmailAddress[] = [{ email: fromEmail }];
@@ -377,6 +458,8 @@ export async function sendEmailSubmission(params: {
   accountId: string;
   identity: Identity;
   emailId: string;
+  draftsMailboxId: string;
+  sentMailboxId: string;
   to: string;
   cc?: string;
   bcc?: string;
@@ -407,8 +490,14 @@ export async function sendEmailSubmission(params: {
             ...(params.sendAt ? { sendAt: params.sendAt } : {})
           }
         },
-        // RFC 8621: remove the associated Email after successful submission creation.
-        onSuccessDestroyEmail: [createId]
+        // On successful submission creation, move the draft into Sent (don't destroy).
+        onSuccessUpdateEmail: {
+          [`#${createId}`]: {
+            [`mailboxIds/${params.draftsMailboxId}`]: null,
+            [`mailboxIds/${params.sentMailboxId}`]: true,
+            "keywords/$draft": null
+          }
+        }
       },
       callId
     ]

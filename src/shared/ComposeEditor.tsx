@@ -86,6 +86,7 @@ const FontSize = Extension.create({
 type Props = {
   valueHtml: string;
   onChangeHtml: (next: string) => void;
+  onInlineImage?: (img: { cid: string; file: File }) => void;
   placeholder?: string;
 };
 
@@ -113,9 +114,30 @@ function htmlOrEmpty(editorHtml: string, editorText: string) {
   return editorText.trim() === "" ? "" : editorHtml;
 }
 
-export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "Write your message…" }: Props) {
+export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, placeholder = "Write your message…" }: Props) {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const createdObjectUrlsRef = useRef<string[]>([]);
   const [picker, setPicker] = useState<Picker>(null);
+
+  const InlineImage = useMemo(
+    () =>
+      Image.extend({
+        addAttributes() {
+          return {
+            ...this.parent?.(),
+            dataCid: {
+              default: null,
+              parseHTML: (element) => (element as HTMLElement).getAttribute("data-cid"),
+              renderHTML: (attributes) => {
+                const cid = attributes.dataCid as string | null;
+                return cid ? { "data-cid": cid } : {};
+              }
+            }
+          };
+        }
+      }),
+    []
+  );
 
   const extensions = useMemo(
     () => [
@@ -131,15 +153,15 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
         autolink: true,
         linkOnPaste: true
       }),
-      Image.configure({
+      InlineImage.configure({
         inline: true,
-        allowBase64: true
+        allowBase64: false
       }),
       Placeholder.configure({
         placeholder
       })
     ],
-    [placeholder]
+    [InlineImage, placeholder]
   );
 
   const editor = useEditor({
@@ -166,13 +188,14 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
 
     const insertFileAsImage = (file: File) => {
       if (!file.type.startsWith("image/")) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const src = String(reader.result ?? "");
-        if (!src) return;
-        editor.chain().focus().setImage({ src }).run();
-      };
-      reader.readAsDataURL(file);
+      const cid = `duck-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const src = URL.createObjectURL(file);
+      createdObjectUrlsRef.current.push(src);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      editor.chain().focus().setImage({ src, alt: file.name, title: file.name, dataCid: cid } as any).run();
+      // bubble up so MailPage can upload these and rewrite HTML to cid:...
+      // (we’ll filter by what is still referenced at send time)
+      onInlineImage?.({ cid, file });
     };
 
     const onPaste = (e: ClipboardEvent) => {
@@ -198,7 +221,20 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
       dom.removeEventListener("paste", onPaste);
       dom.removeEventListener("drop", onDrop);
     };
-  }, [editor]);
+  }, [editor, onInlineImage]);
+
+  useEffect(() => {
+    return () => {
+      for (const url of createdObjectUrlsRef.current) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          // ignore
+        }
+      }
+      createdObjectUrlsRef.current = [];
+    };
+  }, []);
 
   const fontFamilyValue = editor?.getAttributes("textStyle").fontFamily ?? "";
   const fontSizeValue = editor?.getAttributes("textStyle").fontSize ?? "";
@@ -306,13 +342,12 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (!file || !editor) return;
-          const reader = new FileReader();
-          reader.onload = () => {
-            const src = String(reader.result ?? "");
-            if (!src) return;
-            editor.chain().focus().setImage({ src }).run();
-          };
-          reader.readAsDataURL(file);
+          const cid = `duck-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+          const src = URL.createObjectURL(file);
+          createdObjectUrlsRef.current.push(src);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          editor.chain().focus().setImage({ src, alt: file.name, title: file.name, dataCid: cid } as any).run();
+          onInlineImage?.({ cid, file });
           e.currentTarget.value = "";
         }}
       />

@@ -1,12 +1,18 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DOMPurify from "dompurify";
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
+
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
 
 const EmailContainer = styled.div`
   all: initial;
   display: block;
   border-radius: 8px;
   overflow: hidden;
+  position: relative;
 
   & {
     font-family: Arial, sans-serif;
@@ -39,6 +45,25 @@ const EmailContainer = styled.div`
   }
 `;
 
+const LoadingOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  min-height: 80px;
+`;
+
+const Spinner = styled.div`
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255, 204, 0, 0.25);
+  border-top-color: #ffcc00;
+  border-radius: 50%;
+  animation: ${spin} 0.8s linear infinite;
+`;
+
 export default function SafeEmailViewer({
   htmlContent,
   textContent,
@@ -49,6 +74,7 @@ export default function SafeEmailViewer({
   className?: string;
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const sanitizedHtml = useMemo(() => {
     if (!htmlContent || htmlContent.trim().length === 0) return "";
@@ -58,7 +84,10 @@ export default function SafeEmailViewer({
         ADD_ATTR: ["target"],
         FORBID_TAGS: ["script", "iframe", "object", "embed"],
         FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover"],
-        ALLOW_DATA_ATTR: false
+        ALLOW_DATA_ATTR: false,
+        // Allow inline images rewritten to blob: URLs (created after authenticated fetch).
+        // Keep this tight: only allow http(s), mailto/tel, blob and data.
+        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|blob|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
       }) ?? ""
     );
   }, [htmlContent]);
@@ -78,20 +107,31 @@ export default function SafeEmailViewer({
   };
 
   useEffect(() => {
+    setIsLoading(true);
     adjustHeight();
     window.addEventListener("resize", adjustHeight);
     return () => window.removeEventListener("resize", adjustHeight);
   }, [srcDoc]);
 
+  const handleLoad = () => {
+    adjustHeight();
+    setIsLoading(false);
+  };
+
   if (srcDoc) {
     return (
       <EmailContainer className={className}>
+        {isLoading && (
+          <LoadingOverlay>
+            <Spinner />
+          </LoadingOverlay>
+        )}
         <iframe
           ref={iframeRef}
           title="Email content"
           sandbox="allow-same-origin allow-popups"
           srcDoc={srcDoc}
-          onLoad={adjustHeight}
+          onLoad={handleLoad}
         />
       </EmailContainer>
     );
