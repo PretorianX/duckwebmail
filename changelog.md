@@ -7,3 +7,5 @@
 - Simplify compose toolbar: keep font/size/undo visible and move other actions into a single “More” sheet.
 - Rename “Mailboxes” to “Folders” and add a nested folder tree with expand/collapse plus quick filtering for fast browsing in large folder hierarchies.
 - Add local Stalwart mail server via Docker Compose (SMTP/Submission/IMAP/JMAP + admin/API) with self-signed TLS for development.
+- Sync active profile display across tabs/windows (react to `localStorage` changes).
+- Integrate Stalwart JMAP for login (Basic Auth, in-memory session) with Vite dev proxy; add auth context and JMAP client utilities.

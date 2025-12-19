@@ -7,6 +7,7 @@ type Profile = { id: string; name: string };
 
 const STORAGE_ACTIVE_PROFILE = "activeProfileId";
 const STORAGE_PROFILES = "profiles";
+const PROFILE_STORAGE_EVENT = "duckwebmail:profile-storage";
 
 function readProfiles(): Profile[] {
   const raw = localStorage.getItem(STORAGE_PROFILES);
@@ -196,11 +197,35 @@ export default function ProfileMenu() {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_PROFILES, JSON.stringify(profiles));
+    window.dispatchEvent(new Event(PROFILE_STORAGE_EVENT));
   }, [profiles]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_ACTIVE_PROFILE, activeProfileId);
+    window.dispatchEvent(new Event(PROFILE_STORAGE_EVENT));
   }, [activeProfileId]);
+
+  useEffect(() => {
+    const syncFromStorage = () => {
+      const next = readActiveProfileId(readProfiles());
+      setActiveProfileId((prev) => (prev === next ? prev : next));
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.storageArea !== localStorage) return;
+      if (e.key !== null && e.key !== STORAGE_ACTIVE_PROFILE && e.key !== STORAGE_PROFILES) return;
+      syncFromStorage();
+    };
+    const onCustom: EventListener = () => {
+      syncFromStorage();
+    };
+
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(PROFILE_STORAGE_EVENT, onCustom);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(PROFILE_STORAGE_EVENT, onCustom);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;

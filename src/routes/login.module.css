@@ -82,4 +82,18 @@
   background: var(--duck-orange-light);
 }
 
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--error-background, #fef2f2);
+  color: var(--error-color, #dc2626);
+  border: 1px solid var(--error-border, #fecaca);
+  font-size: 0.9rem;
+}
+
 

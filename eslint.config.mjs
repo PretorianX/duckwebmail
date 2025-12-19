@@ -27,7 +27,12 @@ export default [
       globals: {
         window: "readonly",
         document: "readonly",
-        localStorage: "readonly"
+        localStorage: "readonly",
+        fetch: "readonly",
+        btoa: "readonly",
+        URL: "readonly",
+        Blob: "readonly",
+        console: "readonly"
       }
     },
     settings: {

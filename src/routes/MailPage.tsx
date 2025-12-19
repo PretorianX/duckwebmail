@@ -1262,5 +1262,3 @@ export default function MailPage() {
     </main>
   );
 }
-
-

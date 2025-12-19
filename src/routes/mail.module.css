@@ -485,6 +485,36 @@
   gap: 4px;
 }
 
+.loadingState,
+.errorState,
+.emptyState,
+.bodyLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 16px;
+  color: var(--light-text);
+  font-size: 0.95rem;
+}
+
+.errorState {
+  color: var(--error-color, #dc2626);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .listHeader {
   padding: 0 2px 4px;
   display: flex;
