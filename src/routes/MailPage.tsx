@@ -185,7 +185,7 @@ function decodeBasicUsername(authHeader: string): string | null {
   if (!trimmed.toLowerCase().startsWith("basic ")) return null;
   const encoded = trimmed.slice(6).trim();
   try {
-    const decoded = atob(encoded);
+    const decoded = globalThis.atob(encoded);
     const idx = decoded.indexOf(":");
     const user = (idx >= 0 ? decoded.slice(0, idx) : decoded).trim();
     return user || null;

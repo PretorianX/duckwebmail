@@ -9,8 +9,10 @@ import styles from "./login.module.css";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { signIn, activeProfile } = useAuth();
+  const { signIn, activeProfile, activeAuth } = useAuth();
   const isMobile = useMediaQuery("(max-width: 880px)");
+  const branding = (import.meta.env.VITE_LOGIN_BRANDING as string | undefined)?.trim();
+  const brandingText = branding ? branding : "Pure Email";
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,49 +39,59 @@ export default function LoginPage() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <div className={styles.brand}>🦆 DuckWebmail</div>
         <div style={{ display: "inline-flex", gap: 10, alignItems: "center" }}>
-          <ProfileMenu />
+          {activeAuth ? <ProfileMenu /> : null}
           {isMobile ? null : <ThemeToggle />}
         </div>
       </header>
 
-      <section className={styles.card}>
-        <h1 className={styles.title}>Sign in ({activeProfile.name})</h1>
-        <p className={styles.subtitle}>Your mail, private by default.</p>
+      <section className={styles.center}>
+        <div className={styles.stack}>
+          <div className={styles.branding}>{brandingText}</div>
 
-        <form className={styles.form} onSubmit={handleSubmit}>
-          {error && <div className={styles.error}>{error}</div>}
+          <div className={styles.card}>
+            <h1 className={styles.title}>{activeAuth ? `Sign in (${activeProfile.name})` : "Sign in"}</h1>
 
-          <label className={styles.label}>
-            Email / Username
-            <input
-              className={styles.input}
-              type="text"
-              name="email"
-              autoComplete="username"
-              inputMode="email"
-              placeholder='e.g. "test" (or "test@domain.ote")'
-              required
-            />
-          </label>
+            <form className={styles.form} onSubmit={handleSubmit}>
+              {error && <div className={styles.error}>{error}</div>}
 
-          <label className={styles.label}>
-            Password
-            <input
-              className={styles.input}
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              required
-            />
-          </label>
+              <label className={styles.label}>
+                Email / Username
+                <input
+                  className={styles.input}
+                  type="text"
+                  name="email"
+                  autoComplete="username"
+                  inputMode="email"
+                  placeholder='e.g. "test" (or "test@domain.ote")'
+                  required
+                />
+              </label>
 
-          <button className={styles.primaryButton} type="submit" disabled={loading}>
-            {loading ? "Signing in…" : "Continue"}
-          </button>
-        </form>
+              <label className={styles.label}>
+                Password
+                <input
+                  className={styles.input}
+                  type="password"
+                  name="password"
+                  autoComplete="current-password"
+                  required
+                />
+              </label>
+
+              <button className={styles.primaryButton} type="submit" disabled={loading}>
+                {loading ? "Signing in…" : "Continue"}
+              </button>
+            </form>
+
+            <blockquote className={styles.subtitle}>
+              <q>Pure Clean emails service for you, your family and business.</q>
+            </blockquote>
+          </div>
+        </div>
       </section>
+
+      <footer className={styles.footer}>© {new Date().getFullYear()} mail-duck.com</footer>
     </main>
   );
 }

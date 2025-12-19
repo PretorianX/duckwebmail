@@ -19,8 +19,6 @@ export function useTheme(): ThemeContextValue {
   return ctx;
 }
 
-const MOBILE_MEDIA_QUERY = "(max-width: 880px)";
-
 const STORAGE_THEME = "theme";
 const STORAGE_SCHEME = "duckwebmail:themeScheme";
 
@@ -37,6 +35,15 @@ function envDefaultScheme(): ThemeSchemeId | null {
 
 function getSystemTheme(): Theme {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function shouldFollowSystemTheme(): boolean {
+  // If the user has already chosen a theme, do not override it.
+  const saved = localStorage.getItem(STORAGE_THEME);
+  if (saved === "dark" || saved === "light") return false;
+
+  // Otherwise use the deployment default.
+  return envDefaultTheme() === "system";
 }
 
 function getInitialTheme(): Theme {
@@ -64,22 +71,13 @@ function getInitialScheme(): ThemeSchemeId {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [manualTheme, setManualTheme] = useState<Theme>(() => getInitialTheme());
   const [systemTheme, setSystemTheme] = useState<Theme>(() => getSystemTheme());
-  const [isMobile, setIsMobile] = useState<boolean>(() => window.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false);
   const [scheme, _setScheme] = useState<ThemeSchemeId>(() => getInitialScheme());
+  const [followSystemTheme, setFollowSystemTheme] = useState<boolean>(() => shouldFollowSystemTheme());
 
   // Do not auto-write defaults into localStorage.
   // We only persist when the user explicitly changes theme/scheme (later: Settings UI).
   const shouldPersistThemeRef = useRef(localStorage.getItem(STORAGE_THEME) !== null);
   const shouldPersistSchemeRef = useRef(localStorage.getItem(STORAGE_SCHEME) !== null);
-
-  useEffect(() => {
-    const mq = window.matchMedia?.(MOBILE_MEDIA_QUERY);
-    if (!mq) return;
-    const onChange = () => setIsMobile(mq.matches);
-    onChange();
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
@@ -90,14 +88,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  const theme: Theme = isMobile ? systemTheme : manualTheme;
+  // Until Settings exist, ALL devices follow VITE_DEFAULT_THEME.
+  // If it is set to "system", we track OS theme changes.
+  const theme: Theme = followSystemTheme ? systemTheme : manualTheme;
 
   const toggleTheme = useCallback(() => {
-    // Mobile follows the device theme; manual switching is desktop-only.
-    if (isMobile) return;
+    // Until Settings exist, we still allow manual switching via the toggle
+    // (desktop-only UI in most places), and persist that explicit choice.
     shouldPersistThemeRef.current = true;
+    setFollowSystemTheme(false);
     setManualTheme((prev) => (prev === "light" ? "dark" : "light"));
-  }, [isMobile]);
+  }, []);
 
   const setScheme = useCallback((next: ThemeSchemeId) => {
     shouldPersistSchemeRef.current = true;

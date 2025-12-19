@@ -11,6 +11,7 @@ services:
       # Allowed VITE_DEFAULT_SCHEME: duck | pure-email | paper | mono
       VITE_DEFAULT_THEME: ${VITE_DEFAULT_THEME:-light}
       VITE_DEFAULT_SCHEME: ${VITE_DEFAULT_SCHEME:-pure-email}
+      VITE_LOGIN_BRANDING: ${VITE_LOGIN_BRANDING:-Pure Email}
     command: ["sh", "-lc", "npm ci && npm run dev -- --host 0.0.0.0 --port 8002"]
     volumes:
       - .:/app
