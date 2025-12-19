@@ -1059,6 +1059,9 @@
   border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  max-height: calc(100dvh - 24px);
+  display: flex;
+  flex-direction: column;
 }
 
 .modalHeader {
@@ -1089,6 +1092,8 @@
   padding: 14px;
   display: grid;
   gap: 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .field {
@@ -1101,6 +1106,59 @@
 .fieldLabel {
   font: inherit;
   color: inherit;
+}
+
+.fieldHeaderRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fieldHint {
+  font-weight: 900;
+  font-size: 0.85em;
+  color: var(--text-color);
+  opacity: 0.8;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 55%;
+}
+
+.fieldActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.miniToggle {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-color);
+  font-weight: 900;
+  font-size: 0.78rem;
+  letter-spacing: 0.2px;
+}
+
+.miniToggle:hover {
+  border-color: rgba(255, 204, 0, 0.45);
+  background: rgba(255, 204, 0, 0.08);
+}
+
+.miniToggle:focus {
+  outline: none;
+  border-color: rgba(255, 204, 0, 0.65);
+  box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.18);
+}
+
+.miniToggle[aria-pressed="true"] {
+  border-color: rgba(255, 204, 0, 0.65);
+  background: rgba(255, 204, 0, 0.16);
 }
 
 .input,

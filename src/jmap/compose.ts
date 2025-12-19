@@ -293,12 +293,16 @@ export async function upsertDraftEmail(params: {
   draftsMailboxId: string;
   from: string;
   to: string;
+  cc?: string;
+  bcc?: string;
   subject: string;
   htmlBody: string;
   attachments: File[];
   emailId?: string | null;
 }): Promise<{ emailId: string }> {
   const toEmails = parseEmailList(params.to);
+  const ccEmails = parseEmailList(params.cc ?? "");
+  const bccEmails = parseEmailList(params.bcc ?? "");
   const fromEmail = params.from.trim();
   if (fromEmail === "") throw new Error("From address is required");
   const { bodyStructure, bodyValues } = buildBodyStructure({
@@ -312,6 +316,8 @@ export async function upsertDraftEmail(params: {
 
   const from: EmailAddress[] = [{ email: fromEmail }];
   const to: EmailAddress[] = toAddressList(toEmails);
+  const cc: EmailAddress[] = toAddressList(ccEmails);
+  const bcc: EmailAddress[] = toAddressList(bccEmails);
 
   const callId = generateCallId("emlset");
   const createId = generateCallId("draft");
@@ -320,6 +326,8 @@ export async function upsertDraftEmail(params: {
     mailboxIds: { [params.draftsMailboxId]: true },
     from,
     to,
+    cc,
+    bcc,
     subject: params.subject || "",
     bodyStructure,
     bodyValues
@@ -370,10 +378,15 @@ export async function sendEmailSubmission(params: {
   identity: Identity;
   emailId: string;
   to: string;
+  cc?: string;
+  bcc?: string;
   sendAt?: string | null;
 }): Promise<{ submissionId: string }> {
   const rcptTo = parseEmailList(params.to);
-  if (rcptTo.length === 0) throw new Error("Recipient is required");
+  const rcptCc = parseEmailList(params.cc ?? "");
+  const rcptBcc = parseEmailList(params.bcc ?? "");
+  const allRecipients = [...rcptTo, ...rcptCc, ...rcptBcc];
+  if (allRecipients.length === 0) throw new Error("Recipient is required");
 
   const callId = generateCallId("sub");
   const createId = generateCallId("send");
@@ -389,7 +402,7 @@ export async function sendEmailSubmission(params: {
             identityId: params.identity.id,
             envelope: {
               mailFrom: { email: params.identity.email },
-              rcptTo: rcptTo.map((email) => ({ email }))
+              rcptTo: allRecipients.map((email) => ({ email }))
             },
             ...(params.sendAt ? { sendAt: params.sendAt } : {})
           }

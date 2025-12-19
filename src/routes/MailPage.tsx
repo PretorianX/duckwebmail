@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+
 
 import {
   ChevronDown,
@@ -25,10 +25,11 @@ import {
 import ProfileMenu from "../shared/ProfileMenu";
 import SafeEmailViewer from "../shared/SafeEmailViewer";
 import ComposeEditor from "../shared/ComposeEditor";
+import { useMediaQuery } from "../shared/useMediaQuery";
 import { useAuth } from "../auth/AuthContext";
 import { getPrimarySubmissionAccountId } from "../jmap/normalizeSession";
 import { createMailbox, deleteMailbox, getMailboxes, moveMailbox, renameMailbox, type JmapMailbox } from "../jmap/mailbox";
-import { formatQuotaBytes, getQuotaPercentage, getQuotas, type JmapQuota } from "../jmap/quota";
+import { formatQuotaBytes, getQuotas, type JmapQuota } from "../jmap/quota";
 import { getDraftsMailboxId, getOrCreateIdentity, sendEmailSubmission, upsertDraftEmail } from "../jmap/compose";
 import {
   clearEmailListCacheForAccount,
@@ -150,6 +151,8 @@ function toMessage(email: JmapEmailSummary): Message {
 type ComposeDraft = {
   from: string;
   to: string;
+  cc: string;
+  bcc: string;
   subject: string;
   // HTML (rich-text) body
   body: string;
@@ -228,8 +231,8 @@ function decodeBasicUsername(authHeader: string): string | null {
 }
 
 export default function MailPage() {
-  const navigate = useNavigate();
-  const { activeAuth: auth, activeProfile, signOut } = useAuth();
+  const { activeAuth: auth, activeProfile } = useAuth();
+  const isDesktop = useMediaQuery("(min-width: 768px)");
   const sendMenuRef = useRef<HTMLDivElement | null>(null);
   const attachmentsInputRef = useRef<HTMLInputElement | null>(null);
   const scheduledForInputRef = useRef<HTMLInputElement | null>(null);
@@ -257,7 +260,9 @@ export default function MailPage() {
   const [composeDraftEmailId, setComposeDraftEmailId] = useState<string | null>(null);
   const [rowActionsMessageId, setRowActionsMessageId] = useState<string | null>(null);
   const [expandedToIds, setExpandedToIds] = useState<Set<string>>(() => new Set());
-  const [composeDraft, setComposeDraft] = useState<ComposeDraft>({ from: "", to: "", subject: "", body: "" });
+  const [composeDraft, setComposeDraft] = useState<ComposeDraft>({ from: "", to: "", cc: "", bcc: "", subject: "", body: "" });
+  const [composeShowCc, setComposeShowCc] = useState(false);
+  const [composeShowBcc, setComposeShowBcc] = useState(false);
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledFor, setScheduledFor] = useState<string>("");
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
@@ -656,12 +661,14 @@ export default function MailPage() {
   const hasDraft = useMemo(() => composeMinimized, [composeMinimized]);
   const isComposeDirty = useMemo(() => {
     if (composeDraft.to.trim() !== "") return true;
+    if (composeDraft.cc.trim() !== "") return true;
+    if (composeDraft.bcc.trim() !== "") return true;
     if (composeDraft.subject.trim() !== "") return true;
     if (composeDraft.body.trim() !== "") return true;
     if (attachments.length > 0) return true;
     if (scheduleEnabled) return true;
     return false;
-  }, [attachments.length, composeDraft.body, composeDraft.subject, composeDraft.to, scheduleEnabled]);
+  }, [attachments.length, composeDraft.bcc, composeDraft.body, composeDraft.cc, composeDraft.subject, composeDraft.to, scheduleEnabled]);
 
   useEffect(() => {
     // Switching folder should never keep old expanded state around.
@@ -892,12 +899,18 @@ export default function MailPage() {
       const acctName = auth?.session.accounts?.[auth.accountId]?.name ?? "";
       return typeof acctName === "string" && acctName.includes("@") ? acctName : "";
     })();
+    const cc = draft?.cc ?? "";
+    const bcc = draft?.bcc ?? "";
     setComposeDraft({
       from: draft?.from ?? inferredFrom,
       to: draft?.to ?? "",
+      cc,
+      bcc,
       subject: draft?.subject ?? "",
       body: draft?.body ? plainTextToHtml(draft.body) : ""
     });
+    setComposeShowCc(cc.trim() !== "");
+    setComposeShowBcc(bcc.trim() !== "");
     setScheduleEnabled(false);
     setScheduledFor("");
     setSendMenuOpen(false);
@@ -929,7 +942,9 @@ export default function MailPage() {
     setComposeBusy(false);
     setComposeError(null);
     setComposeDraftEmailId(null);
-    setComposeDraft({ from: "", to: "", subject: "", body: "" });
+    setComposeDraft({ from: "", to: "", cc: "", bcc: "", subject: "", body: "" });
+    setComposeShowCc(false);
+    setComposeShowBcc(false);
     setScheduleEnabled(false);
     setScheduledFor("");
     setAttachments([]);
@@ -952,6 +967,8 @@ export default function MailPage() {
         draftsMailboxId: draftsId,
         from: composeDraft.from,
         to: composeDraft.to,
+        cc: composeDraft.cc,
+        bcc: composeDraft.bcc,
         subject: composeDraft.subject,
         htmlBody: composeDraft.body,
         attachments,
@@ -978,7 +995,7 @@ export default function MailPage() {
       setComposeError("From address is required.");
       return;
     }
-    if (composeDraft.to.trim() === "") {
+    if (composeDraft.to.trim() === "" && composeDraft.cc.trim() === "" && composeDraft.bcc.trim() === "") {
       setComposeError("Recipient is required.");
       return;
     }
@@ -1013,6 +1030,8 @@ export default function MailPage() {
         draftsMailboxId: draftsId,
         from: composeDraft.from,
         to: composeDraft.to,
+        cc: composeDraft.cc,
+        bcc: composeDraft.bcc,
         subject: composeDraft.subject,
         htmlBody: composeDraft.body,
         attachments,
@@ -1032,6 +1051,8 @@ export default function MailPage() {
         identity,
         emailId,
         to: composeDraft.to,
+        cc: composeDraft.cc,
+        bcc: composeDraft.bcc,
         sendAt
       });
 
@@ -1297,7 +1318,7 @@ export default function MailPage() {
                 className={styles.headerEmail}
                 title="Click to copy email"
                 onClick={() => {
-                  void navigator.clipboard.writeText(signedInEmail);
+                  void globalThis.navigator?.clipboard?.writeText(signedInEmail);
                   setEmailCopied(true);
                   setTimeout(() => setEmailCopied(false), 1500);
                 }}
@@ -2207,8 +2228,15 @@ export default function MailPage() {
                   {composeError}
                 </div>
               )}
-              <label className={styles.field}>
-                From
+              <div className={styles.field}>
+                <div className={styles.fieldHeaderRow}>
+                  <div className={styles.fieldLabel}>From</div>
+                  {isDesktop && activeProfileName.trim() !== "" && (
+                    <div className={styles.fieldHint} title="Profile">
+                      {activeProfileName}
+                    </div>
+                  )}
+                </div>
                 <input
                   className={styles.input}
                   type="email"
@@ -2217,9 +2245,36 @@ export default function MailPage() {
                   disabled={composeBusy}
                   onChange={(e) => setComposeDraft((prev) => ({ ...prev, from: e.target.value }))}
                 />
-              </label>
-              <label className={styles.field}>
-                To
+              </div>
+
+              <div className={styles.field}>
+                <div className={styles.fieldHeaderRow}>
+                  <div className={styles.fieldLabel}>To</div>
+                  {isDesktop && (
+                    <div className={styles.fieldActions}>
+                      <button
+                        type="button"
+                        className={styles.miniToggle}
+                        aria-pressed={composeShowCc}
+                        title="Add CC"
+                        onClick={() => setComposeShowCc((v) => !v)}
+                        disabled={composeBusy}
+                      >
+                        CC
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.miniToggle}
+                        aria-pressed={composeShowBcc}
+                        title="Add BCC"
+                        onClick={() => setComposeShowBcc((v) => !v)}
+                        disabled={composeBusy}
+                      >
+                        BCC
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <input
                   className={styles.input}
                   type="email"
@@ -2228,7 +2283,35 @@ export default function MailPage() {
                   disabled={composeBusy}
                   onChange={(e) => setComposeDraft((prev) => ({ ...prev, to: e.target.value }))}
                 />
-              </label>
+              </div>
+
+              {(composeShowCc || composeDraft.cc.trim() !== "") && (
+                <label className={styles.field}>
+                  CC
+                  <input
+                    className={styles.input}
+                    type="email"
+                    placeholder="cc@example.com"
+                    value={composeDraft.cc}
+                    disabled={composeBusy}
+                    onChange={(e) => setComposeDraft((prev) => ({ ...prev, cc: e.target.value }))}
+                  />
+                </label>
+              )}
+
+              {(composeShowBcc || composeDraft.bcc.trim() !== "") && (
+                <label className={styles.field}>
+                  BCC
+                  <input
+                    className={styles.input}
+                    type="email"
+                    placeholder="bcc@example.com"
+                    value={composeDraft.bcc}
+                    disabled={composeBusy}
+                    onChange={(e) => setComposeDraft((prev) => ({ ...prev, bcc: e.target.value }))}
+                  />
+                </label>
+              )}
               <label className={styles.field}>
                 Subject
                 <input
