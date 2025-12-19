@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
@@ -91,7 +91,6 @@ vi.mock("../jmap/email", () => {
       if (e.id !== emailId) return e;
       const next = { ...e, keywords: { ...(e.keywords ?? {}) } as Record<string, boolean> };
       if (value === null) {
-        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
         delete (next.keywords as Record<string, boolean>)[key];
       } else {
         (next.keywords as Record<string, boolean>)[key] = value;

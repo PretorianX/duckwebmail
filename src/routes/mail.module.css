@@ -290,11 +290,28 @@
 }
 
 .folderLabel {
-  font-weight: 800;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
+}
+
+.folderLabelUnread {
+  font-weight: 900;
+}
+
+.folderLabelParent {
+  /* Parent-ness is communicated via chevron + branch icon, not bold text */
+}
+
+.folderLabelParent .folderToggle {
+  color: var(--text-color);
+}
+
+.folderLabelParentOpen .folderToggle {
+  background: rgba(255, 204, 0, 0.12);
+  color: var(--text-color);
 }
 
 .folderToggle {
@@ -313,8 +330,18 @@
   color: var(--text-color);
 }
 
+.folderBranchIcon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.55;
+  color: var(--light-text);
+  flex: 0 0 auto;
+}
+
 .folderTogglePlaceholder {
   opacity: 0.55;
+  width: 12px;
+  height: 12px;
 }
 
 .folderToggleSpacer {
@@ -950,14 +977,30 @@
 }
 
 .expanded {
-  border-top: 1px solid var(--border-color);
-  padding: 10px 12px 12px;
+  border-top: 1px solid transparent;
+  padding: 0 12px;
   display: grid;
   gap: 10px;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition:
+    max-height 220ms ease,
+    opacity 160ms ease,
+    padding 220ms ease,
+    border-top-color 220ms ease,
+    transform 220ms ease;
 }
 
-.expanded[hidden] {
-  display: none !important;
+.expandedOpen {
+  border-top-color: var(--border-color);
+  padding: 10px 12px 12px;
+  max-height: 80vh;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .emailBody {
@@ -1341,6 +1384,15 @@
   border: none;
   color: var(--text-color);
   font-weight: 850;
+}
+
+.sendMenuItem:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sendMenuItem:disabled:hover {
+  background: transparent;
 }
 
 .sendMenuItem:hover {

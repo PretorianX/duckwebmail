@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes, type ReactNode } from "react";
 
 
 import {
   ChevronDown,
   ChevronRight,
+  CornerDownRight,
   Clock,
   Download,
   FileDown,
@@ -237,6 +238,9 @@ export default function MailPage() {
   const sendMenuRef = useRef<HTMLDivElement | null>(null);
   const attachmentsInputRef = useRef<HTMLInputElement | null>(null);
   const scheduledForInputRef = useRef<HTMLInputElement | null>(null);
+  const listRef = useRef<HTMLElement | null>(null);
+  const rowGroupRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const pendingScrollAnchorRef = useRef<{ messageId: string; top: number } | null>(null);
   const [folderId, setFolderId] = useState<string>("");
   // Keep a ref to the current folderId so event callbacks always see the latest value.
   const folderIdRef = useRef(folderId);
@@ -255,7 +259,7 @@ export default function MailPage() {
   const [folderOpError, setFolderOpError] = useState<string | null>(null);
   const [folderOpName, setFolderOpName] = useState("");
   const [folderOpParentId, setFolderOpParentId] = useState<string | null>(null);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
   const [expandedAttachmentIds, setExpandedAttachmentIds] = useState<Set<string>>(() => new Set());
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeMinimized, setComposeMinimized] = useState(false);
@@ -679,12 +683,29 @@ export default function MailPage() {
 
   useEffect(() => {
     // Switching folder should never keep old expanded state around.
-    setExpandedIds(new Set());
+    setExpandedMessageId(null);
     setExpandedAttachmentIds(new Set());
+    setExpandedToIds(new Set());
     setDraggingEmailId(null);
     setDraggingEmailFromFolderId(null);
     setDropTargetFolderId(null);
   }, [folderId]);
+
+  useLayoutEffect(() => {
+    const pending = pendingScrollAnchorRef.current;
+    if (!pending) return;
+    const listEl = listRef.current;
+    const anchorEl = rowGroupRefs.current.get(pending.messageId) ?? null;
+    if (!listEl || !anchorEl) {
+      pendingScrollAnchorRef.current = null;
+      return;
+    }
+
+    const afterTop = anchorEl.getBoundingClientRect().top;
+    const delta = afterTop - pending.top;
+    if (Math.abs(delta) >= 1) listEl.scrollTop += delta;
+    pendingScrollAnchorRef.current = null;
+  }, [expandedMessageId]);
 
   const performMoveEmail = async (params: { emailId: string; fromFolderId: string; toFolderId: string }) => {
     if (!auth) return;
@@ -703,11 +724,7 @@ export default function MailPage() {
       if (folderIdRef.current === params.fromFolderId) {
         setMessages((prev) => prev.filter((m) => m.id !== params.emailId));
         setMessagesTotal((prev) => (typeof prev === "number" ? Math.max(0, prev - 1) : prev));
-        setExpandedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(params.emailId);
-          return next;
-        });
+        setExpandedMessageId((prev) => (prev === params.emailId ? null : prev));
         setExpandedAttachmentIds((prev) => {
           const next = new Set(prev);
           next.delete(params.emailId);
@@ -1147,18 +1164,18 @@ export default function MailPage() {
   };
 
   const toggleExpanded = (messageId: string) => {
-    const ensureBodyLoaded = async () => {
+    const ensureBodyLoaded = async (targetMessageId: string) => {
       if (!auth) return;
       setBodyErrors((prev) => {
-        if (!prev[messageId]) return prev;
+        if (!prev[targetMessageId]) return prev;
         const next = { ...prev };
-        delete next[messageId];
+        delete next[targetMessageId];
         return next;
       });
       setBodyLoadingIds((prev) => {
-        if (prev.has(messageId)) return prev;
+        if (prev.has(targetMessageId)) return prev;
         const next = new Set(prev);
-        next.add(messageId);
+        next.add(targetMessageId);
         return next;
       });
 
@@ -1167,40 +1184,45 @@ export default function MailPage() {
           apiUrl: auth.session.apiUrl,
           authHeader: auth.authHeader,
           accountId: auth.accountId,
-          emailId: messageId
+          emailId: targetMessageId
         });
         const resolved = body.html
           ? await resolveCidImagesToObjectUrls(body.html, body.bodyStructure)
           : { html: body.html ?? "", objectUrls: [] };
         setMessages((prev) =>
-          prev.map((m) => (m.id === messageId ? { ...m, html: resolved.html || m.html, text: body.text ?? m.text } : m))
+          prev.map((m) =>
+            m.id === targetMessageId ? { ...m, html: resolved.html || m.html, text: body.text ?? m.text } : m
+          )
         );
       } catch (err) {
-        setBodyErrors((prev) => ({ ...prev, [messageId]: err instanceof Error ? err.message : "Failed to load message body" }));
+        setBodyErrors((prev) => ({
+          ...prev,
+          [targetMessageId]: err instanceof Error ? err.message : "Failed to load message body"
+        }));
       } finally {
         setBodyLoadingIds((prev) => {
           const next = new Set(prev);
-          next.delete(messageId);
+          next.delete(targetMessageId);
           return next;
         });
       }
     };
 
-    const markAsReadIfNeeded = async () => {
+    const markAsReadIfNeeded = async (targetMessageId: string) => {
       if (!auth) return;
       // Find the message and check if it's unread
-      const msg = messages.find((m) => m.id === messageId);
+      const msg = messages.find((m) => m.id === targetMessageId);
       if (!msg || !msg.unread) return;
 
       // Optimistically update local state
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, unread: false } : m)));
+      setMessages((prev) => prev.map((m) => (m.id === targetMessageId ? { ...m, unread: false } : m)));
 
       // Send JMAP request to mark as read
       const success = await markEmailAsRead({
         apiUrl: auth.session.apiUrl,
         authHeader: auth.authHeader,
         accountId: auth.accountId,
-        emailId: messageId
+        emailId: targetMessageId
       });
 
       if (success) {
@@ -1209,22 +1231,32 @@ export default function MailPage() {
       }
     };
 
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(messageId)) {
-        next.delete(messageId);
-        setExpandedAttachmentIds((prevAttachments) => {
-          const nextAttachments = new Set(prevAttachments);
-          nextAttachments.delete(messageId);
-          return nextAttachments;
-        });
-      } else {
-        next.add(messageId);
-        void ensureBodyLoaded();
-        void markAsReadIfNeeded();
-      }
-      return next;
-    });
+    const anchorEl = rowGroupRefs.current.get(messageId) ?? null;
+    if (anchorEl) pendingScrollAnchorRef.current = { messageId, top: anchorEl.getBoundingClientRect().top };
+
+    const prevExpandedId = expandedMessageId;
+    const nextExpandedId = prevExpandedId === messageId ? null : messageId;
+
+    // If we're switching messages, collapse the previously open one.
+    if (prevExpandedId && prevExpandedId !== nextExpandedId) {
+      setExpandedAttachmentIds((prev) => {
+        const next = new Set(prev);
+        next.delete(prevExpandedId);
+        return next;
+      });
+      setExpandedToIds((prev) => {
+        const next = new Set(prev);
+        next.delete(prevExpandedId);
+        return next;
+      });
+    }
+
+    setExpandedMessageId(nextExpandedId);
+
+    if (nextExpandedId) {
+      void ensureBodyLoaded(nextExpandedId);
+      void markAsReadIfNeeded(nextExpandedId);
+    }
   };
 
   const toggleAttachments = (messageId: string) => {
@@ -1313,11 +1345,7 @@ export default function MailPage() {
 
       // Optimistic removal.
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
-      setExpandedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(messageId);
-        return next;
-      });
+      setExpandedMessageId((prev) => (prev === messageId ? null : prev));
       setRowActionsMessageId((prev) => (prev === messageId ? null : prev));
 
       const ok = await destroyEmail({
@@ -1384,7 +1412,7 @@ export default function MailPage() {
 
   const sanitizeFilename = (value: string) => {
     const trimmed = value.trim();
-    const safe = (trimmed || "message").replace(/[\/\\?%*:|"<>]/g, "_");
+    const safe = (trimmed || "message").replace(/[/\\?%*:|"<>]/g, "_");
     return safe.length > 180 ? safe.slice(0, 180) : safe;
   };
 
@@ -1495,7 +1523,7 @@ export default function MailPage() {
       triggerBlobDownload(filename, blob);
     } catch (e) {
       console.error("[EmlDownload] failed:", e);
-      alert("Failed to download .eml. Please try again.");
+      globalThis.alert("Failed to download .eml. Please try again.");
     }
   };
 
@@ -1679,7 +1707,13 @@ export default function MailPage() {
                             }
                           }}
                         >
-                          <span className={styles.folderLabel} style={{ paddingLeft: `${10 + depth * 14}px` }}>
+                          <span
+                            className={`${styles.folderLabel} ${f.unread > 0 ? styles.folderLabelUnread : ""} ${
+                              hasChildren ? styles.folderLabelParent : ""
+                            } ${hasChildren && isOpen ? styles.folderLabelParentOpen : ""}`}
+                            style={{ paddingLeft: `${6 + depth * 12}px` }}
+                          >
+                            {depth > 0 && <CornerDownRight className={`${styles.icon} ${styles.folderBranchIcon}`} aria-hidden="true" />}
                             <span
                               className={`${styles.folderToggle} ${hasChildren ? "" : styles.folderTogglePlaceholder}`}
                               role={hasChildren ? "button" : undefined}
@@ -1708,7 +1742,11 @@ export default function MailPage() {
                                 <span className={styles.folderToggleSpacer} aria-hidden="true" />
                               )}
                             </span>
-                            <span className={styles.folderDuck} aria-hidden="true">
+                            <span
+                              className={styles.folderDuck}
+                              aria-hidden="true"
+                              style={{ visibility: active ? "visible" : "hidden" }}
+                            >
                               🦆
                             </span>
                             <span className={styles.folderNameText}>{f.name}</span>
@@ -1783,7 +1821,13 @@ export default function MailPage() {
           <ProfileMenu />
         </div>
 
-        <section className={styles.list} aria-label="Message list">
+        <section
+          ref={(el) => {
+            listRef.current = el;
+          }}
+          className={styles.list}
+          aria-label="Message list"
+        >
           {messagesLoading ? (
             <div className={styles.loadingState} aria-live="polite">
               <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
@@ -1800,10 +1844,17 @@ export default function MailPage() {
             <div className={styles.emptyState}>No emails in this folder.</div>
           ) : (
             messages.map((msg) => {
-          const isOpen = expandedIds.has(msg.id);
+          const isOpen = expandedMessageId === msg.id;
           const regionId = `message-body-${msg.id}`;
           return (
-            <div key={msg.id} className={`${styles.rowGroup} ${isOpen ? styles.rowGroupOpen : ""}`}>
+            <div
+              key={msg.id}
+              ref={(el) => {
+                if (el) rowGroupRefs.current.set(msg.id, el);
+                else rowGroupRefs.current.delete(msg.id);
+              }}
+              className={`${styles.rowGroup} ${isOpen ? styles.rowGroupOpen : ""}`}
+            >
               <div
                 className={`${styles.row} ${canDragEmails ? styles.rowDraggable : ""} ${isOpen ? styles.rowOpen : ""}`}
                 role="button"
@@ -1874,10 +1925,11 @@ export default function MailPage() {
               <div
                 id={regionId}
                 data-testid={regionId}
-                className={styles.expanded}
+                className={`${styles.expanded} ${isOpen ? styles.expandedOpen : ""}`}
                 role="region"
                 aria-label={`Message ${msg.subject}`}
-                hidden={!isOpen}
+                aria-hidden={!isOpen}
+                {...(!isOpen ? ({ inert: "" } as unknown as HTMLAttributes<HTMLDivElement>) : {})}
               >
                 <div className={styles.expandedMeta}>
                   <div>
@@ -2412,7 +2464,15 @@ export default function MailPage() {
                                 }
                               }}
                             >
-                              <span className={styles.folderLabel} style={{ paddingLeft: `${10 + depth * 14}px` }}>
+                              <span
+                                className={`${styles.folderLabel} ${f.unread > 0 ? styles.folderLabelUnread : ""} ${
+                                  hasChildren ? styles.folderLabelParent : ""
+                                } ${hasChildren && isOpen ? styles.folderLabelParentOpen : ""}`}
+                                style={{ paddingLeft: `${6 + depth * 12}px` }}
+                              >
+                                {depth > 0 && (
+                                  <CornerDownRight className={`${styles.icon} ${styles.folderBranchIcon}`} aria-hidden="true" />
+                                )}
                                 <span
                                   className={`${styles.folderToggle} ${hasChildren ? "" : styles.folderTogglePlaceholder}`}
                                   role={hasChildren ? "button" : undefined}
@@ -2441,7 +2501,11 @@ export default function MailPage() {
                                     <span className={styles.folderToggleSpacer} aria-hidden="true" />
                                   )}
                                 </span>
-                                <span className={styles.folderDuck} aria-hidden="true">
+                                <span
+                                  className={styles.folderDuck}
+                                  aria-hidden="true"
+                                  style={{ visibility: active ? "visible" : "hidden" }}
+                                >
                                   🦆
                                 </span>
                                 <span className={styles.folderNameText}>{f.name}</span>

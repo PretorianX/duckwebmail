@@ -320,7 +320,7 @@ function buildBodyStructure(params: {
     size: img.size
   }));
 
-  const attachmentParts: EmailBodyPart[] = params.attachments.map((a, idx) => ({
+  const attachmentParts: EmailBodyPart[] = params.attachments.map((a) => ({
     blobId: a.blobId,
     type: normalizeLeafMimeType(a.type) || "application/octet-stream",
     name: a.name,

@@ -87,7 +87,7 @@ export default function SafeEmailViewer({
         ALLOW_DATA_ATTR: false,
         // Allow inline images rewritten to blob: URLs (created after authenticated fetch).
         // Keep this tight: only allow http(s), mailto/tel, blob and data.
-        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|blob|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|blob|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
       }) ?? ""
     );
   }, [htmlContent]);
