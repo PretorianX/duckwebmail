@@ -685,6 +685,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
 }
 
 .iconButton {
@@ -1316,10 +1317,29 @@
     grid-row: 1 / span 2;
     align-self: start;
     padding-top: 1px;
+    max-width: 44vw;
+    min-width: 0;
   }
 
   .rightMeta {
     gap: 6px;
+  }
+
+  .actions {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .actions > * {
+    flex: 0 0 auto;
   }
 
   .attachmentIndicator {
@@ -1354,6 +1374,17 @@
   .iconButton {
     width: 30px;
     height: 30px;
+  }
+
+  .expandedSecondRow {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .downloadRow {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: auto;
   }
 }
 

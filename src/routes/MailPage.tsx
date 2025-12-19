@@ -10,6 +10,7 @@ import {
   Forward,
   Mail,
   MailOpen,
+  MoreHorizontal,
   Paperclip,
   Pencil,
   Reply,
@@ -23,6 +24,7 @@ import ThemeToggle from "../theme/ThemeToggle";
 import ProfileMenu from "../shared/ProfileMenu";
 import SafeEmailViewer from "../shared/SafeEmailViewer";
 import ComposeEditor from "../shared/ComposeEditor";
+import { useMediaQuery } from "../shared/useMediaQuery";
 import styles from "./mail.module.css";
 
 type Folder = { id: string; name: string; unread: number; parentId?: string | null };
@@ -193,6 +195,7 @@ export default function MailPage() {
   const sendMenuRef = useRef<HTMLDivElement | null>(null);
   const attachmentsInputRef = useRef<HTMLInputElement | null>(null);
   const scheduledForInputRef = useRef<HTMLInputElement | null>(null);
+  const compactRowActions = useMediaQuery("(max-width: 420px)");
   const [folderId, setFolderId] = useState(demoFolders[0].id);
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
   const [folderQuery, setFolderQuery] = useState("");
@@ -204,6 +207,7 @@ export default function MailPage() {
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeMinimized, setComposeMinimized] = useState(false);
   const [composeCancelConfirmOpen, setComposeCancelConfirmOpen] = useState(false);
+  const [rowActionsMessageId, setRowActionsMessageId] = useState<string | null>(null);
   const [composeDraft, setComposeDraft] = useState<ComposeDraft>({ to: "", subject: "", body: "" });
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledFor, setScheduledFor] = useState<string>("");
@@ -376,7 +380,13 @@ export default function MailPage() {
       next.delete(messageId);
       return next;
     });
+    setRowActionsMessageId((prev) => (prev === messageId ? null : prev));
   };
+
+  const rowActionsMessage = useMemo(
+    () => (rowActionsMessageId ? messages.find((m) => m.id === rowActionsMessageId) ?? null : null),
+    [messages, rowActionsMessageId]
+  );
 
   const formatBytes = (bytes: number) => {
     const units = ["B", "KB", "MB", "GB"];
@@ -661,51 +671,69 @@ export default function MailPage() {
                           <Forward className={styles.icon} aria-hidden="true" />
                         </button>
 
-                        <button
-                          type="button"
-                          className={`${styles.iconButton} ${msg.starred ? styles.iconButtonActive : ""}`}
-                          aria-label={`${msg.starred ? "Unstar" : "Star"} ${msg.subject}`}
-                          title={msg.starred ? "Unstar" : "Star"}
-                          onClick={() => {
-                            setHoveredMessageId(msg.id);
-                            setFocusedMessageId(msg.id);
-                            toggleStar(msg.id);
-                          }}
-                        >
-                          <Star className={styles.icon} aria-hidden="true" fill={msg.starred ? "currentColor" : "none"} />
-                        </button>
+                        {compactRowActions ? (
+                          <button
+                            type="button"
+                            className={styles.iconButton}
+                            aria-label={`More actions ${msg.subject}`}
+                            title="More actions"
+                            onClick={() => setRowActionsMessageId(msg.id)}
+                          >
+                            <MoreHorizontal className={styles.icon} aria-hidden="true" />
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className={`${styles.iconButton} ${msg.starred ? styles.iconButtonActive : ""}`}
+                              aria-label={`${msg.starred ? "Unstar" : "Star"} ${msg.subject}`}
+                              title={msg.starred ? "Unstar" : "Star"}
+                              onClick={() => {
+                                setHoveredMessageId(msg.id);
+                                setFocusedMessageId(msg.id);
+                                toggleStar(msg.id);
+                              }}
+                            >
+                              <Star
+                                className={styles.icon}
+                                aria-hidden="true"
+                                fill={msg.starred ? "currentColor" : "none"}
+                              />
+                            </button>
 
-                        <button
-                          type="button"
-                          className={styles.iconButton}
-                          aria-label={`Mark ${msg.unread ? "read" : "unread"} ${msg.subject}`}
-                          title={msg.unread ? "Mark read" : "Mark unread"}
-                          onClick={() => {
-                            setHoveredMessageId(msg.id);
-                            setFocusedMessageId(msg.id);
-                            toggleUnread(msg.id);
-                          }}
-                        >
-                          {msg.unread ? (
-                            <MailOpen className={styles.icon} aria-hidden="true" />
-                          ) : (
-                            <Mail className={styles.icon} aria-hidden="true" />
-                          )}
-                        </button>
+                            <button
+                              type="button"
+                              className={styles.iconButton}
+                              aria-label={`Mark ${msg.unread ? "read" : "unread"} ${msg.subject}`}
+                              title={msg.unread ? "Mark read" : "Mark unread"}
+                              onClick={() => {
+                                setHoveredMessageId(msg.id);
+                                setFocusedMessageId(msg.id);
+                                toggleUnread(msg.id);
+                              }}
+                            >
+                              {msg.unread ? (
+                                <MailOpen className={styles.icon} aria-hidden="true" />
+                              ) : (
+                                <Mail className={styles.icon} aria-hidden="true" />
+                              )}
+                            </button>
 
-                        <button
-                          type="button"
-                          className={`${styles.iconButton} ${styles.dangerButton}`}
-                          aria-label={`Delete ${msg.subject}`}
-                          title="Delete"
-                          onClick={() => {
-                            setHoveredMessageId(msg.id);
-                            setFocusedMessageId(msg.id);
-                            deleteMessage(msg.id);
-                          }}
-                        >
-                          <Trash2 className={styles.icon} aria-hidden="true" />
-                        </button>
+                            <button
+                              type="button"
+                              className={`${styles.iconButton} ${styles.dangerButton}`}
+                              aria-label={`Delete ${msg.subject}`}
+                              title="Delete"
+                              onClick={() => {
+                                setHoveredMessageId(msg.id);
+                                setFocusedMessageId(msg.id);
+                                deleteMessage(msg.id);
+                              }}
+                            >
+                              <Trash2 className={styles.icon} aria-hidden="true" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     ) : (
                       <div className={styles.rightMeta}>
@@ -816,6 +844,107 @@ export default function MailPage() {
         })}
         </section>
       </section>
+
+      {rowActionsMessage && (
+        <div
+          className={styles.sheetOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Message actions"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setRowActionsMessageId(null);
+          }}
+        >
+          <div className={styles.sheet} role="document">
+            <div className={styles.sheetHeader}>
+              <div className={styles.sheetTitle}>Actions</div>
+            </div>
+            <div className={styles.sheetBody}>
+              <button
+                className={styles.sendMenuItem}
+                type="button"
+                onClick={() => {
+                  beginCompose({ to: rowActionsMessage.from, subject: `Re: ${rowActionsMessage.subject}`, body: "" });
+                  setRowActionsMessageId(null);
+                }}
+              >
+                <span className={styles.sendMenuItemRow}>
+                  <Reply className={styles.icon} aria-hidden="true" />
+                  Reply
+                </span>
+              </button>
+
+              <button
+                className={styles.sendMenuItem}
+                type="button"
+                onClick={() => {
+                  beginCompose({
+                    to: "",
+                    subject: `Fwd: ${rowActionsMessage.subject}`,
+                    body: rowActionsMessage.text ?? ""
+                  });
+                  setRowActionsMessageId(null);
+                }}
+              >
+                <span className={styles.sendMenuItemRow}>
+                  <Forward className={styles.icon} aria-hidden="true" />
+                  Forward
+                </span>
+              </button>
+
+              <button
+                className={styles.sendMenuItem}
+                type="button"
+                onClick={() => {
+                  toggleStar(rowActionsMessage.id);
+                  setRowActionsMessageId(null);
+                }}
+              >
+                <span className={styles.sendMenuItemRow}>
+                  <Star
+                    className={styles.icon}
+                    aria-hidden="true"
+                    fill={rowActionsMessage.starred ? "currentColor" : "none"}
+                  />
+                  {rowActionsMessage.starred ? "Unstar" : "Star"}
+                </span>
+              </button>
+
+              <button
+                className={styles.sendMenuItem}
+                type="button"
+                onClick={() => {
+                  toggleUnread(rowActionsMessage.id);
+                  setRowActionsMessageId(null);
+                }}
+              >
+                <span className={styles.sendMenuItemRow}>
+                  {rowActionsMessage.unread ? (
+                    <MailOpen className={styles.icon} aria-hidden="true" />
+                  ) : (
+                    <Mail className={styles.icon} aria-hidden="true" />
+                  )}
+                  {rowActionsMessage.unread ? "Mark read" : "Mark unread"}
+                </span>
+              </button>
+
+              <button
+                className={styles.sendMenuItem}
+                type="button"
+                onClick={() => {
+                  deleteMessage(rowActionsMessage.id);
+                  setRowActionsMessageId(null);
+                }}
+              >
+                <span className={styles.sendMenuItemRow}>
+                  <Trash2 className={styles.icon} aria-hidden="true" />
+                  Delete
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!composeOpen && (
         <button
