@@ -14,6 +14,26 @@
   justify-content: flex-end;
 }
 
+.headerActions {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.backToInbox {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 2px solid var(--duck-orange);
+  background: transparent;
+  color: var(--duck-orange);
+  font-weight: 900;
+}
+
+.backToInbox:hover {
+  background-color: rgba(247, 148, 29, 0.12);
+}
+
 .center {
   display: flex;
   align-items: center;

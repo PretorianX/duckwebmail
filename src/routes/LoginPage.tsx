@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
@@ -9,13 +9,15 @@ import styles from "./login.module.css";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { signIn, activeProfile, activeAuth } = useAuth();
+  const { signIn, activeProfile, activeAuth, profiles, authByProfile, setActiveProfileId } = useAuth();
   const isMobile = useMediaQuery("(max-width: 880px)");
   const branding = (import.meta.env.VITE_LOGIN_BRANDING as string | undefined)?.trim();
   const brandingText = branding ? branding : "Pure Email";
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const anyAuthedProfile = useMemo(() => profiles.find((p) => !!authByProfile[p.id]) ?? null, [profiles, authByProfile]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -39,8 +41,21 @@ export default function LoginPage() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <div style={{ display: "inline-flex", gap: 10, alignItems: "center" }}>
-          {activeAuth ? <ProfileMenu /> : null}
+        <div className={styles.headerActions}>
+          {anyAuthedProfile ? (
+            <button
+              type="button"
+              className={styles.backToInbox}
+              title="Back to inbox"
+              onClick={() => {
+                if (!activeAuth && anyAuthedProfile) setActiveProfileId(anyAuthedProfile.id);
+                navigate("/mail");
+              }}
+            >
+              Inbox
+            </button>
+          ) : null}
+          <ProfileMenu />
           {isMobile ? null : <ThemeToggle />}
         </div>
       </header>
