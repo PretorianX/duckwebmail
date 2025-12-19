@@ -238,6 +238,17 @@ export default function MailPage() {
   const [bodyLoadingIds, setBodyLoadingIds] = useState<Set<string>>(() => new Set());
   const [bodyErrors, setBodyErrors] = useState<Record<string, string>>({});
   const activeProfileName = useMemo(() => readActiveProfileName(), []);
+  const [canDragFolders, setCanDragFolders] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(pointer: fine) and (hover: hover)");
+    const apply = () => setCanDragFolders(media.matches);
+    apply();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const onChange = () => apply();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
 
   const [mailboxesLoading, setMailboxesLoading] = useState(false);
   const [mailboxesError, setMailboxesError] = useState<string | null>(null);
@@ -848,11 +859,13 @@ export default function MailPage() {
             role="tree"
             aria-label="Folders"
             onDragOver={(e) => {
+              if (!canDragFolders) return;
               if (!draggingFolderId) return;
               e.preventDefault();
               e.dataTransfer.dropEffect = "move";
             }}
             onDrop={(e) => {
+              if (!canDragFolders) return;
               if (!draggingFolderId) return;
               if (e.target !== e.currentTarget) return;
               e.preventDefault();
@@ -903,27 +916,32 @@ export default function MailPage() {
                           }`}
                           tabIndex={0}
                           aria-current={active ? "page" : undefined}
-                          draggable={(mailboxById.get(f.id)?.role ?? "").trim().length === 0}
+                          draggable={canDragFolders && (mailboxById.get(f.id)?.role ?? "").trim().length === 0}
                           onDragStart={(e) => {
+                            if (!canDragFolders) return;
                             setDraggingFolderId(f.id);
                             e.dataTransfer.setData("text/plain", f.id);
                             e.dataTransfer.effectAllowed = "move";
                           }}
                           onDragEnd={() => {
+                            if (!canDragFolders) return;
                             setDraggingFolderId(null);
                             setDropTargetFolderId(null);
                           }}
                           onDragEnter={(e) => {
+                            if (!canDragFolders) return;
                             if (!draggingFolderId) return;
                             e.preventDefault();
                             setDropTargetFolderId(f.id);
                           }}
                           onDragOver={(e) => {
+                            if (!canDragFolders) return;
                             if (!draggingFolderId) return;
                             e.preventDefault();
                             e.dataTransfer.dropEffect = "move";
                           }}
                           onDrop={(e) => {
+                            if (!canDragFolders) return;
                             e.preventDefault();
                             e.stopPropagation();
                             const dragId = draggingFolderId ?? e.dataTransfer.getData("text/plain");
@@ -1521,11 +1539,13 @@ export default function MailPage() {
                 role="tree"
                 aria-label="Folders"
                 onDragOver={(e) => {
+                  if (!canDragFolders) return;
                   if (!draggingFolderId) return;
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
                 }}
                 onDrop={(e) => {
+                  if (!canDragFolders) return;
                   if (!draggingFolderId) return;
                   if (e.target !== e.currentTarget) return;
                   e.preventDefault();
@@ -1576,27 +1596,32 @@ export default function MailPage() {
                               }`}
                               tabIndex={0}
                               aria-current={active ? "page" : undefined}
-                              draggable={(mailboxById.get(f.id)?.role ?? "").trim().length === 0}
+                              draggable={canDragFolders && (mailboxById.get(f.id)?.role ?? "").trim().length === 0}
                               onDragStart={(e) => {
+                                if (!canDragFolders) return;
                                 setDraggingFolderId(f.id);
                                 e.dataTransfer.setData("text/plain", f.id);
                                 e.dataTransfer.effectAllowed = "move";
                               }}
                               onDragEnd={() => {
+                                if (!canDragFolders) return;
                                 setDraggingFolderId(null);
                                 setDropTargetFolderId(null);
                               }}
                               onDragEnter={(e) => {
+                                if (!canDragFolders) return;
                                 if (!draggingFolderId) return;
                                 e.preventDefault();
                                 setDropTargetFolderId(f.id);
                               }}
                               onDragOver={(e) => {
+                                if (!canDragFolders) return;
                                 if (!draggingFolderId) return;
                                 e.preventDefault();
                                 e.dataTransfer.dropEffect = "move";
                               }}
                               onDrop={(e) => {
+                                if (!canDragFolders) return;
                                 e.preventDefault();
                                 e.stopPropagation();
                                 const dragId = draggingFolderId ?? e.dataTransfer.getData("text/plain");

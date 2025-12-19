@@ -13,3 +13,4 @@
 - Load real folder list from JMAP (`Mailbox/get`) and render it in the folder tree + picker with loading/error states.
 - Add folder operations (create/rename/delete) backed by JMAP `Mailbox/set`, including nested folder creation via parent selection.
 - Load real email list per folder via JMAP (`Email/query` + `Email/get`) with inline message body fetch on expand.
+- Fix mobile folder picker UX: restore scrolling and make folder actions (“…”) reliably tappable.

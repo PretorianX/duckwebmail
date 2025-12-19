@@ -114,6 +114,13 @@
   pointer-events: none;
 }
 
+@media (hover: none), (pointer: coarse) {
+  .folderMoreButton {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 .folderItem:hover .folderMoreButton,
 .folderItem:focus .folderMoreButton,
 .folderItem:focus-visible .folderMoreButton,
@@ -523,6 +530,8 @@
   flex-direction: column;
   gap: 6px;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .sheetFolderItem {
