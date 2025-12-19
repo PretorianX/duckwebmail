@@ -10,3 +10,4 @@
 - Sync active profile display across tabs/windows (react to `localStorage` changes).
 - Integrate Stalwart JMAP for login (Basic Auth, in-memory session) with Vite dev proxy; add auth context and JMAP client utilities.
 - Fix JMAP login by requesting `/jmap/session` directly (avoid `/.well-known/jmap` redirect edge cases) and show clearer local-dev credential hints.
+- Load real folder list from JMAP (`Mailbox/get`) and render it in the folder tree + picker with loading/error states.

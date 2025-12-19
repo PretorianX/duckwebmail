@@ -8,6 +8,7 @@ import {
   Download,
   FileDown,
   Forward,
+  LoaderCircle,
   Mail,
   MailOpen,
   MoreHorizontal,
@@ -24,6 +25,8 @@ import ThemeToggle from "../theme/ThemeToggle";
 import ProfileMenu from "../shared/ProfileMenu";
 import SafeEmailViewer from "../shared/SafeEmailViewer";
 import ComposeEditor from "../shared/ComposeEditor";
+import { useAuth } from "../auth/AuthContext";
+import { getMailboxes, type JmapMailbox } from "../jmap/mailbox";
 import styles from "./mail.module.css";
 
 type Folder = { id: string; name: string; unread: number; parentId?: string | null };
@@ -77,17 +80,27 @@ function readActiveProfileName(): string {
   return profiles.find((p) => p.id === active)?.name ?? "Personal";
 }
 
-const demoFolders: Folder[] = [
-  { id: "inbox", name: "Inbox", unread: 3, parentId: null },
-  { id: "inbox/newsletters", name: "Newsletters", unread: 1, parentId: "inbox" },
-  { id: "inbox/travel", name: "Travel", unread: 0, parentId: "inbox" },
-  { id: "inbox/travel/receipts", name: "Receipts", unread: 0, parentId: "inbox/travel" },
-  { id: "inbox/work", name: "Work", unread: 2, parentId: "inbox" },
-  { id: "archive", name: "Archive", unread: 0, parentId: null },
-  { id: "archive/2025", name: "2025", unread: 0, parentId: "archive" },
-  { id: "archive/2025/projects", name: "Projects", unread: 0, parentId: "archive/2025" },
-  { id: "sent", name: "Sent", unread: 0, parentId: null }
-];
+function sortMailboxes(a: JmapMailbox, b: JmapMailbox): number {
+  const sa = a.sortOrder ?? 0;
+  const sb = b.sortOrder ?? 0;
+  if (sa !== sb) return sa - sb;
+  return a.name.localeCompare(b.name);
+}
+
+function toFolder(mbx: JmapMailbox): Folder {
+  return {
+    id: mbx.id,
+    name: mbx.name,
+    unread: mbx.unreadEmails ?? 0,
+    parentId: mbx.parentId ?? null
+  };
+}
+
+function pickDefaultFolderId(mailboxes: JmapMailbox[]): string | null {
+  const inbox = mailboxes.find((m) => (m.role ?? "").toLowerCase() === "inbox");
+  if (inbox) return inbox.id;
+  return mailboxes[0]?.id ?? null;
+}
 
 const demoMessages: Message[] = [
   {
@@ -219,13 +232,14 @@ const getBimiInitial = (from: string) => {
 
 export default function MailPage() {
   const navigate = useNavigate();
+  const { auth, signOut } = useAuth();
   const sendMenuRef = useRef<HTMLDivElement | null>(null);
   const attachmentsInputRef = useRef<HTMLInputElement | null>(null);
   const scheduledForInputRef = useRef<HTMLInputElement | null>(null);
-  const [folderId, setFolderId] = useState(demoFolders[0].id);
+  const [folderId, setFolderId] = useState<string>("");
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
   const [folderQuery, setFolderQuery] = useState("");
-  const [openFolderIds, setOpenFolderIds] = useState<Set<string>>(() => new Set(["inbox", "archive"]));
+  const [openFolderIds, setOpenFolderIds] = useState<Set<string>>(() => new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [expandedAttachmentIds, setExpandedAttachmentIds] = useState<Set<string>>(() => new Set());
   const [composeOpen, setComposeOpen] = useState(false);
@@ -241,10 +255,65 @@ export default function MailPage() {
   const [messages, setMessages] = useState<Message[]>(() => demoMessages);
   const activeProfileName = useMemo(() => readActiveProfileName(), []);
 
+  const [mailboxesLoading, setMailboxesLoading] = useState(false);
+  const [mailboxesError, setMailboxesError] = useState<string | null>(null);
+  const [mailboxes, setMailboxes] = useState<JmapMailbox[]>([]);
+
+  const loadMailboxes = async (opts?: { force?: boolean }) => {
+    if (!auth) return;
+    setMailboxesError(null);
+    setMailboxesLoading(true);
+    try {
+      const res = await getMailboxes({
+        apiUrl: auth.session.apiUrl,
+        authHeader: auth.authHeader,
+        accountId: auth.accountId,
+        force: opts?.force
+      });
+      const sorted = [...res.mailboxes].sort(sortMailboxes);
+      setMailboxes(sorted);
+    } catch (err) {
+      setMailboxesError(err instanceof Error ? err.message : "Failed to load folders");
+      setMailboxes([]);
+    } finally {
+      setMailboxesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadMailboxes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth?.accountId, auth?.authHeader, auth?.session.apiUrl]);
+
+  useEffect(() => {
+    if (mailboxesLoading) return;
+    if (mailboxes.length === 0) return;
+    setFolderId((prev) => {
+      if (prev && mailboxes.some((m) => m.id === prev)) return prev;
+      return pickDefaultFolderId(mailboxes) ?? prev;
+    });
+  }, [mailboxes, mailboxesLoading]);
+
+  useEffect(() => {
+    if (mailboxesLoading) return;
+    if (mailboxes.length === 0) return;
+    const byRole = (role: string) => mailboxes.find((m) => (m.role ?? "").toLowerCase() === role)?.id ?? null;
+    const inboxId = byRole("inbox");
+    const archiveId = byRole("archive");
+    setOpenFolderIds((prev) => {
+      const next = new Set(prev);
+      if (inboxId) next.add(inboxId);
+      if (archiveId) next.add(archiveId);
+      return next;
+    });
+  }, [mailboxes, mailboxesLoading]);
+
+  const folders: Folder[] = useMemo(() => mailboxes.map(toFolder), [mailboxes]);
+
   const folderIndex = useMemo(() => {
     const byId = new Map<string, Folder>();
     const childrenByParent = new Map<string | null, Folder[]>();
-    for (const f of demoFolders) {
+    for (const f of folders) {
       byId.set(f.id, f);
       const parentKey = f.parentId ?? null;
       const list = childrenByParent.get(parentKey) ?? [];
@@ -253,13 +322,13 @@ export default function MailPage() {
     }
     for (const [, list] of childrenByParent) list.sort((a, b) => a.name.localeCompare(b.name));
     return { byId, childrenByParent };
-  }, []);
+  }, [folders]);
 
   const normalizedFolderQuery = useMemo(() => folderQuery.trim().toLowerCase(), [folderQuery]);
   const { visibleFolderIds, autoExpandFolderIds } = useMemo(() => {
     if (normalizedFolderQuery === "") return { visibleFolderIds: null as Set<string> | null, autoExpandFolderIds: new Set<string>() };
     const matches = new Set<string>();
-    for (const f of demoFolders) {
+    for (const f of folders) {
       if (f.name.toLowerCase().includes(normalizedFolderQuery)) matches.add(f.id);
     }
 
@@ -293,7 +362,12 @@ export default function MailPage() {
     });
   };
 
-  const folder = useMemo(() => demoFolders.find((f) => f.id === folderId)!, [folderId]);
+  const folder = useMemo(() => {
+    const selected = folderIndex.byId.get(folderId);
+    if (selected) return selected;
+    const first = folders[0];
+    return first ?? { id: "", name: "Folders", unread: 0, parentId: null };
+  }, [folderId, folderIndex.byId, folders]);
   const hasDraft = useMemo(() => composeMinimized, [composeMinimized]);
   const isComposeDirty = useMemo(() => {
     if (composeDraft.to.trim() !== "") return true;
@@ -477,80 +551,103 @@ export default function MailPage() {
           </div>
 
           <div className={styles.folderTree} role="tree" aria-label="Folders">
-            {(folderIndex.childrenByParent.get(null) ?? [])
-              .filter((root) => (visibleFolderIds ? visibleFolderIds.has(root.id) : true))
-              .map((root) => {
-                const renderNode = (f: Folder, depth: number): ReactNode => {
-                  if (visibleFolderIds && !visibleFolderIds.has(f.id)) return null;
-                  const children = folderIndex.childrenByParent.get(f.id) ?? [];
-                  const hasChildren = children.length > 0;
-                  const isOpen = hasChildren && effectiveOpenFolderIds.has(f.id);
-                  const active = f.id === folderId;
+            {mailboxesLoading ? (
+              <div className={styles.loadingState} aria-live="polite">
+                <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
+                Loading folders…
+              </div>
+            ) : mailboxesError ? (
+              <div className={styles.errorState} role="alert">
+                {mailboxesError}{" "}
+                <button type="button" className={styles.secondaryButton} onClick={() => void loadMailboxes({ force: true })}>
+                  Retry
+                </button>
+              </div>
+            ) : folders.length === 0 ? (
+              <div className={styles.emptyState}>No folders.</div>
+            ) : (
+              (folderIndex.childrenByParent.get(null) ?? [])
+                .filter((root) => (visibleFolderIds ? visibleFolderIds.has(root.id) : true))
+                .map((root) => {
+                  const renderNode = (f: Folder, depth: number): ReactNode => {
+                    if (visibleFolderIds && !visibleFolderIds.has(f.id)) return null;
+                    const children = folderIndex.childrenByParent.get(f.id) ?? [];
+                    const hasChildren = children.length > 0;
+                    const isOpen = hasChildren && effectiveOpenFolderIds.has(f.id);
+                    const active = f.id === folderId;
 
-                  return (
-                    <div key={f.id} className={styles.folderNode}>
-                      <button
-                        type="button"
-                        role="treeitem"
-                        aria-level={depth + 1}
-                        aria-expanded={hasChildren ? isOpen : undefined}
-                        className={`${styles.folderItem} ${active ? styles.folderItemActive : ""}`}
-                        onClick={() => setFolderId(f.id)}
-                        aria-current={active ? "page" : undefined}
-                      >
-                        <span className={styles.folderLabel} style={{ paddingLeft: `${10 + depth * 14}px` }}>
-                          <span
-                            className={`${styles.folderToggle} ${hasChildren ? "" : styles.folderTogglePlaceholder}`}
-                            role={hasChildren ? "button" : undefined}
-                            tabIndex={hasChildren ? 0 : -1}
-                            aria-label={hasChildren ? `${isOpen ? "Collapse" : "Expand"} ${f.name}` : undefined}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (hasChildren) toggleFolderOpen(f.id);
-                            }}
-                            onKeyDown={(e) => {
-                              if (!hasChildren) return;
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
+                    return (
+                      <div key={f.id} className={styles.folderNode}>
+                        <button
+                          type="button"
+                          role="treeitem"
+                          aria-level={depth + 1}
+                          aria-expanded={hasChildren ? isOpen : undefined}
+                          className={`${styles.folderItem} ${active ? styles.folderItemActive : ""}`}
+                          onClick={() => setFolderId(f.id)}
+                          aria-current={active ? "page" : undefined}
+                        >
+                          <span className={styles.folderLabel} style={{ paddingLeft: `${10 + depth * 14}px` }}>
+                            <span
+                              className={`${styles.folderToggle} ${hasChildren ? "" : styles.folderTogglePlaceholder}`}
+                              role={hasChildren ? "button" : undefined}
+                              tabIndex={hasChildren ? 0 : -1}
+                              aria-label={hasChildren ? `${isOpen ? "Collapse" : "Expand"} ${f.name}` : undefined}
+                              onClick={(e) => {
                                 e.stopPropagation();
-                                toggleFolderOpen(f.id);
-                              }
-                            }}
-                          >
-                            {hasChildren ? (
-                              isOpen ? (
-                                <ChevronDown className={styles.icon} aria-hidden="true" />
+                                if (hasChildren) toggleFolderOpen(f.id);
+                              }}
+                              onKeyDown={(e) => {
+                                if (!hasChildren) return;
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  toggleFolderOpen(f.id);
+                                }
+                              }}
+                            >
+                              {hasChildren ? (
+                                isOpen ? (
+                                  <ChevronDown className={styles.icon} aria-hidden="true" />
+                                ) : (
+                                  <ChevronRight className={styles.icon} aria-hidden="true" />
+                                )
                               ) : (
-                                <ChevronRight className={styles.icon} aria-hidden="true" />
-                              )
-                            ) : (
-                              <span className={styles.folderToggleSpacer} aria-hidden="true" />
-                            )}
+                                <span className={styles.folderToggleSpacer} aria-hidden="true" />
+                              )}
+                            </span>
+                            <span className={styles.folderDuck} aria-hidden="true">
+                              🦆
+                            </span>
+                            <span className={styles.folderNameText}>{f.name}</span>
                           </span>
-                          <span className={styles.folderDuck} aria-hidden="true">
-                            🦆
-                          </span>
-                          <span className={styles.folderNameText}>{f.name}</span>
-                        </span>
-                        {f.unread > 0 && <span className={styles.unreadPill}>{f.unread}</span>}
-                      </button>
+                          {f.unread > 0 && <span className={styles.unreadPill}>{f.unread}</span>}
+                        </button>
 
-                      {hasChildren && isOpen && (
-                        <div role="group" className={styles.folderChildren}>
-                          {children.map((c) => renderNode(c, depth + 1))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                };
+                        {hasChildren && isOpen && (
+                          <div role="group" className={styles.folderChildren}>
+                            {children.map((c) => renderNode(c, depth + 1))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  };
 
-                return renderNode(root, 0);
-              })}
+                  return renderNode(root, 0);
+                })
+            )}
           </div>
         </nav>
 
         <div className={styles.sidebarFooter}>
-          <button className={styles.logout} type="button" onClick={() => navigate("/login")}>
+          <button
+            className={styles.logout}
+            type="button"
+            onClick={() => {
+              signOut();
+              navigate("/login");
+            }}
+          >
             ← Sign out
           </button>
         </div>
@@ -919,75 +1016,91 @@ export default function MailPage() {
               </div>
 
               <div className={styles.folderTree} role="tree" aria-label="Folders">
-                {(folderIndex.childrenByParent.get(null) ?? [])
-                  .filter((root) => (visibleFolderIds ? visibleFolderIds.has(root.id) : true))
-                  .map((root) => {
-                    const renderNode = (f: Folder, depth: number): ReactNode => {
-                      if (visibleFolderIds && !visibleFolderIds.has(f.id)) return null;
-                      const children = folderIndex.childrenByParent.get(f.id) ?? [];
-                      const hasChildren = children.length > 0;
-                      const isOpen = hasChildren && effectiveOpenFolderIds.has(f.id);
-                      const active = f.id === folderId;
+                {mailboxesLoading ? (
+                  <div className={styles.loadingState} aria-live="polite">
+                    <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
+                    Loading folders…
+                  </div>
+                ) : mailboxesError ? (
+                  <div className={styles.errorState} role="alert">
+                    {mailboxesError}{" "}
+                    <button type="button" className={styles.secondaryButton} onClick={() => void loadMailboxes({ force: true })}>
+                      Retry
+                    </button>
+                  </div>
+                ) : folders.length === 0 ? (
+                  <div className={styles.emptyState}>No folders.</div>
+                ) : (
+                  (folderIndex.childrenByParent.get(null) ?? [])
+                    .filter((root) => (visibleFolderIds ? visibleFolderIds.has(root.id) : true))
+                    .map((root) => {
+                      const renderNode = (f: Folder, depth: number): ReactNode => {
+                        if (visibleFolderIds && !visibleFolderIds.has(f.id)) return null;
+                        const children = folderIndex.childrenByParent.get(f.id) ?? [];
+                        const hasChildren = children.length > 0;
+                        const isOpen = hasChildren && effectiveOpenFolderIds.has(f.id);
+                        const active = f.id === folderId;
 
-                      return (
-                        <div key={f.id} className={styles.folderNode}>
-                          <button
-                            type="button"
-                            role="treeitem"
-                            aria-level={depth + 1}
-                            aria-expanded={hasChildren ? isOpen : undefined}
-                            className={`${styles.sheetFolderItem} ${active ? styles.sheetFolderItemActive : ""}`}
-                            onClick={() => setFolderId(f.id)}
-                            aria-current={active ? "page" : undefined}
-                          >
-                            <span className={styles.folderLabel} style={{ paddingLeft: `${10 + depth * 14}px` }}>
-                              <span
-                                className={`${styles.folderToggle} ${hasChildren ? "" : styles.folderTogglePlaceholder}`}
-                                role={hasChildren ? "button" : undefined}
-                                tabIndex={hasChildren ? 0 : -1}
-                                aria-label={hasChildren ? `${isOpen ? "Collapse" : "Expand"} ${f.name}` : undefined}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (hasChildren) toggleFolderOpen(f.id);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (!hasChildren) return;
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
+                        return (
+                          <div key={f.id} className={styles.folderNode}>
+                            <button
+                              type="button"
+                              role="treeitem"
+                              aria-level={depth + 1}
+                              aria-expanded={hasChildren ? isOpen : undefined}
+                              className={`${styles.sheetFolderItem} ${active ? styles.sheetFolderItemActive : ""}`}
+                              onClick={() => setFolderId(f.id)}
+                              aria-current={active ? "page" : undefined}
+                            >
+                              <span className={styles.folderLabel} style={{ paddingLeft: `${10 + depth * 14}px` }}>
+                                <span
+                                  className={`${styles.folderToggle} ${hasChildren ? "" : styles.folderTogglePlaceholder}`}
+                                  role={hasChildren ? "button" : undefined}
+                                  tabIndex={hasChildren ? 0 : -1}
+                                  aria-label={hasChildren ? `${isOpen ? "Collapse" : "Expand"} ${f.name}` : undefined}
+                                  onClick={(e) => {
                                     e.stopPropagation();
-                                    toggleFolderOpen(f.id);
-                                  }
-                                }}
-                              >
-                                {hasChildren ? (
-                                  isOpen ? (
-                                    <ChevronDown className={styles.icon} aria-hidden="true" />
+                                    if (hasChildren) toggleFolderOpen(f.id);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (!hasChildren) return;
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      toggleFolderOpen(f.id);
+                                    }
+                                  }}
+                                >
+                                  {hasChildren ? (
+                                    isOpen ? (
+                                      <ChevronDown className={styles.icon} aria-hidden="true" />
+                                    ) : (
+                                      <ChevronRight className={styles.icon} aria-hidden="true" />
+                                    )
                                   ) : (
-                                    <ChevronRight className={styles.icon} aria-hidden="true" />
-                                  )
-                                ) : (
-                                  <span className={styles.folderToggleSpacer} aria-hidden="true" />
-                                )}
+                                    <span className={styles.folderToggleSpacer} aria-hidden="true" />
+                                  )}
+                                </span>
+                                <span className={styles.folderDuck} aria-hidden="true">
+                                  🦆
+                                </span>
+                                <span className={styles.folderNameText}>{f.name}</span>
                               </span>
-                              <span className={styles.folderDuck} aria-hidden="true">
-                                🦆
-                              </span>
-                              <span className={styles.folderNameText}>{f.name}</span>
-                            </span>
-                            {f.unread > 0 && <span className={styles.unreadPill}>{f.unread}</span>}
-                          </button>
+                              {f.unread > 0 && <span className={styles.unreadPill}>{f.unread}</span>}
+                            </button>
 
-                          {hasChildren && isOpen && (
-                            <div role="group" className={styles.folderChildren}>
-                              {children.map((c) => renderNode(c, depth + 1))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    };
+                            {hasChildren && isOpen && (
+                              <div role="group" className={styles.folderChildren}>
+                                {children.map((c) => renderNode(c, depth + 1))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      };
 
-                    return renderNode(root, 0);
-                  })}
+                      return renderNode(root, 0);
+                    })
+                )}
               </div>
             </div>
           </div>
