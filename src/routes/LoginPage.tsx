@@ -9,7 +9,7 @@ import styles from "./login.module.css";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, activeProfile } = useAuth();
   const isMobile = useMediaQuery("(max-width: 880px)");
 
   const [loading, setLoading] = useState(false);
@@ -38,11 +38,14 @@ export default function LoginPage() {
     <main className={styles.page}>
       <header className={styles.header}>
         <div className={styles.brand}>🦆 DuckWebmail</div>
-        {isMobile ? <ProfileMenu /> : <ThemeToggle />}
+        <div style={{ display: "inline-flex", gap: 10, alignItems: "center" }}>
+          <ProfileMenu />
+          {isMobile ? null : <ThemeToggle />}
+        </div>
       </header>
 
       <section className={styles.card}>
-        <h1 className={styles.title}>Sign in</h1>
+        <h1 className={styles.title}>Sign in ({activeProfile.name})</h1>
         <p className={styles.subtitle}>Your mail, private by default.</p>
 
         <form className={styles.form} onSubmit={handleSubmit}>

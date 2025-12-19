@@ -29,7 +29,7 @@ import ComposeEditor from "../shared/ComposeEditor";
 import { useAuth } from "../auth/AuthContext";
 import { createMailbox, deleteMailbox, getMailboxes, moveMailbox, renameMailbox, type JmapMailbox } from "../jmap/mailbox";
 import {
-  clearEmailListCache,
+  clearEmailListCacheForAccount,
   formatAddressList,
   getEmailBody,
   isStarred,
@@ -38,7 +38,7 @@ import {
   markEmailAsRead,
   type JmapEmailSummary
 } from "../jmap/email";
-import { JmapPushClient, stateChangeAffects, type StateChange } from "../jmap/webSocketPush";
+import { JmapPushClient, stateChangeAffectsAccount, type StateChange } from "../jmap/webSocketPush";
 import styles from "./mail.module.css";
 
 type Folder = { id: string; name: string; unread: number; parentId?: string | null };
@@ -64,34 +64,6 @@ type Message = {
   html?: string;
   text?: string;
 };
-
-type Profile = { id: string; name: string };
-const STORAGE_ACTIVE_PROFILE = "activeProfileId";
-const STORAGE_PROFILES = "profiles";
-
-function readProfiles(): Profile[] {
-  const raw = localStorage.getItem(STORAGE_PROFILES);
-  if (!raw) return [{ id: "personal", name: "Personal" }, { id: "work", name: "Work" }];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [{ id: "personal", name: "Personal" }, { id: "work", name: "Work" }];
-    const normalized = parsed
-      .map((p) => (typeof p === "object" && p ? (p as { id?: unknown; name?: unknown }) : null))
-      .filter(Boolean)
-      .map((p) => ({ id: String(p!.id ?? ""), name: String(p!.name ?? "") }))
-      .filter((p) => p.id.length > 0 && p.name.length > 0);
-    return normalized.length > 0 ? normalized : [{ id: "personal", name: "Personal" }, { id: "work", name: "Work" }];
-  } catch {
-    return [{ id: "personal", name: "Personal" }, { id: "work", name: "Work" }];
-  }
-}
-
-function readActiveProfileName(): string {
-  const profiles = readProfiles();
-  const raw = localStorage.getItem(STORAGE_ACTIVE_PROFILE);
-  const active = raw && profiles.some((p) => p.id === raw) ? raw : profiles[0]?.id ?? "personal";
-  return profiles.find((p) => p.id === active)?.name ?? "Personal";
-}
 
 function sortMailboxes(a: JmapMailbox, b: JmapMailbox): number {
   const sa = a.sortOrder ?? 0;
@@ -204,7 +176,7 @@ const getBimiInitial = (from: string) => {
 
 export default function MailPage() {
   const navigate = useNavigate();
-  const { auth, signOut } = useAuth();
+  const { activeAuth: auth, activeProfile, signOut } = useAuth();
   const sendMenuRef = useRef<HTMLDivElement | null>(null);
   const attachmentsInputRef = useRef<HTMLInputElement | null>(null);
   const scheduledForInputRef = useRef<HTMLInputElement | null>(null);
@@ -240,7 +212,7 @@ export default function MailPage() {
   const [messagesTotal, setMessagesTotal] = useState<number | null>(null);
   const [bodyLoadingIds, setBodyLoadingIds] = useState<Set<string>>(() => new Set());
   const [bodyErrors, setBodyErrors] = useState<Record<string, string>>({});
-  const activeProfileName = useMemo(() => readActiveProfileName(), []);
+  const activeProfileName = activeProfile.name;
   const [canDragFolders, setCanDragFolders] = useState(false);
 
   useEffect(() => {
@@ -376,7 +348,7 @@ export default function MailPage() {
       }
     }
     return { visibleFolderIds: visible, autoExpandFolderIds: autoExpand };
-  }, [folderIndex.byId, normalizedFolderQuery]);
+  }, [folderIndex.byId, normalizedFolderQuery, folders]);
 
   const effectiveOpenFolderIds = useMemo(() => {
     if (!visibleFolderIds) return openFolderIds;
@@ -678,8 +650,11 @@ export default function MailPage() {
     const debounceMs = 800;
 
     const handleStateChange = (change: StateChange) => {
-      const affectsMailbox = stateChangeAffects(change, "Mailbox");
-      const affectsEmail = stateChangeAffects(change, "Email");
+      // IMPORTANT: A websocket session can include StateChange for multiple accounts.
+      // Only react to changes for the currently displayed account, otherwise other accounts
+      // (e.g. "Work") will cause refreshes/clears while viewing "Personal".
+      const affectsMailbox = stateChangeAffectsAccount(change, auth.accountId, "Mailbox");
+      const affectsEmail = stateChangeAffectsAccount(change, auth.accountId, "Email");
 
       if (!affectsMailbox && !affectsEmail) return;
 
@@ -691,7 +666,7 @@ export default function MailPage() {
 
       // Clear cached email lists immediately so folder switches get fresh data
       if (affectsEmail) {
-        clearEmailListCache();
+        clearEmailListCacheForAccount({ apiUrl: auth.session.apiUrl, accountId: auth.accountId });
       }
 
       // Debounce: clear any pending refresh and schedule a new one

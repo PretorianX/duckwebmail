@@ -253,3 +253,15 @@ export function stateChangeAffects(change: StateChange, dataType: string): boole
   }
   return false;
 }
+
+/**
+ * Helper to check if a StateChange affects a specific account + data type.
+ *
+ * Some servers may include changes for multiple accounts in a single websocket session,
+ * so consumers should filter by the account they are currently displaying.
+ */
+export function stateChangeAffectsAccount(change: StateChange, accountId: string, dataType: string): boolean {
+  const accountChanges = change.changed?.[accountId];
+  if (!accountChanges) return false;
+  return dataType in accountChanges;
+}

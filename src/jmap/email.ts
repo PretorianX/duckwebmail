@@ -289,3 +289,10 @@ export async function markEmailAsRead(params: {
 export function clearEmailListCache(): void {
   emailListCache.clear();
 }
+
+export function clearEmailListCacheForAccount(params: { apiUrl: string; accountId: string }): void {
+  const prefix = `${params.apiUrl}|${params.accountId}|`;
+  for (const key of emailListCache.keys()) {
+    if (key.startsWith(prefix)) emailListCache.delete(key);
+  }
+}

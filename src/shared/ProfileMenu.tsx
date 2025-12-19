@@ -1,37 +1,10 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
-import { Check, Info, Settings, User, Users } from "lucide-react";
+import { Check, Info, LogIn, LogOut, Settings, ShieldCheck, User, Users } from "lucide-react";
 
-type Profile = { id: string; name: string };
-
-const STORAGE_ACTIVE_PROFILE = "activeProfileId";
-const STORAGE_PROFILES = "profiles";
-const PROFILE_STORAGE_EVENT = "duckwebmail:profile-storage";
-
-function readProfiles(): Profile[] {
-  const raw = localStorage.getItem(STORAGE_PROFILES);
-  if (!raw) return [{ id: "personal", name: "Personal" }, { id: "work", name: "Work" }];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [{ id: "personal", name: "Personal" }, { id: "work", name: "Work" }];
-    const normalized = parsed
-      .map((p) => (typeof p === "object" && p ? (p as { id?: unknown; name?: unknown }) : null))
-      .filter(Boolean)
-      .map((p) => ({ id: String(p!.id ?? ""), name: String(p!.name ?? "") }))
-      .filter((p) => p.id.length > 0 && p.name.length > 0);
-    return normalized.length > 0 ? normalized : [{ id: "personal", name: "Personal" }, { id: "work", name: "Work" }];
-  } catch {
-    return [{ id: "personal", name: "Personal" }, { id: "work", name: "Work" }];
-  }
-}
-
-function readActiveProfileId(profiles: Profile[]): string {
-  const raw = localStorage.getItem(STORAGE_ACTIVE_PROFILE);
-  const fallback = profiles[0]?.id ?? "personal";
-  if (!raw) return fallback;
-  return profiles.some((p) => p.id === raw) ? raw : fallback;
-}
+import { useAuth } from "../auth/AuthContext";
 
 const Wrapper = styled.div`
   position: relative;
@@ -180,6 +153,8 @@ const Subtle = styled.div`
 `;
 
 export default function ProfileMenu() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const menuId = useId();
   const buttonId = `${menuId}-button`;
   const popoverId = `${menuId}-popover`;
@@ -187,45 +162,7 @@ export default function ProfileMenu() {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
-  const [profiles] = useState<Profile[]>(() => readProfiles());
-  const [activeProfileId, setActiveProfileId] = useState<string>(() => readActiveProfileId(readProfiles()));
-
-  const activeProfile = useMemo(
-    () => profiles.find((p) => p.id === activeProfileId) ?? profiles[0] ?? { id: "personal", name: "Personal" },
-    [profiles, activeProfileId]
-  );
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_PROFILES, JSON.stringify(profiles));
-    window.dispatchEvent(new Event(PROFILE_STORAGE_EVENT));
-  }, [profiles]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_ACTIVE_PROFILE, activeProfileId);
-    window.dispatchEvent(new Event(PROFILE_STORAGE_EVENT));
-  }, [activeProfileId]);
-
-  useEffect(() => {
-    const syncFromStorage = () => {
-      const next = readActiveProfileId(readProfiles());
-      setActiveProfileId((prev) => (prev === next ? prev : next));
-    };
-    const onStorage = (e: StorageEvent) => {
-      if (e.storageArea !== localStorage) return;
-      if (e.key !== null && e.key !== STORAGE_ACTIVE_PROFILE && e.key !== STORAGE_PROFILES) return;
-      syncFromStorage();
-    };
-    const onCustom: EventListener = () => {
-      syncFromStorage();
-    };
-
-    window.addEventListener("storage", onStorage);
-    window.addEventListener(PROFILE_STORAGE_EVENT, onCustom);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener(PROFILE_STORAGE_EVENT, onCustom);
-    };
-  }, []);
+  const { profiles, activeProfileId, activeProfile, setActiveProfileId, authByProfile, signOut } = useAuth();
 
   useEffect(() => {
     if (!open) return;
@@ -313,16 +250,30 @@ export default function ProfileMenu() {
           <Section aria-label="Profiles">
             {profiles.map((p) => {
               const active = p.id === activeProfileId;
+              const authed = !!authByProfile[p.id];
               return (
                 <MenuItem
                   key={p.id}
                   type="button"
                   role="menuitemradio"
                   aria-checked={active}
-                  title={active ? "Active profile" : "Switch profile"}
+                  title={
+                    active
+                      ? authed
+                        ? "Active (signed in)"
+                        : "Active (not signed in)"
+                      : authed
+                        ? "Switch to profile"
+                        : "Switch and sign in"
+                  }
                   onClick={() => {
                     setActiveProfileId(p.id);
                     setOpen(false);
+                    if (authed) {
+                      if (location.pathname !== "/mail") navigate("/mail");
+                    } else {
+                      if (location.pathname !== "/login") navigate("/login");
+                    }
                   }}
                 >
                   <ItemLeft>
@@ -334,6 +285,46 @@ export default function ProfileMenu() {
                   {active && (
                     <RightIcon>
                       <Check aria-hidden="true" />
+                    </RightIcon>
+                  )}
+                </MenuItem>
+              );
+            })}
+          </Section>
+
+          <Divider />
+
+          <Section aria-label="Sign in/out">
+            {profiles.map((p) => {
+              const authed = !!authByProfile[p.id];
+              const isActive = p.id === activeProfileId;
+              return (
+                <MenuItem
+                  key={`${p.id}-auth`}
+                  type="button"
+                  role="menuitem"
+                  title={authed ? `Sign out ${p.name}` : `Sign in ${p.name}`}
+                  onClick={() => {
+                    setOpen(false);
+                    if (!isActive) setActiveProfileId(p.id);
+                    if (authed) {
+                      signOut({ profileId: p.id });
+                      if (location.pathname !== "/login") navigate("/login");
+                    } else {
+                      if (location.pathname !== "/login") navigate("/login");
+                    }
+                  }}
+                >
+                  <ItemLeft>
+                    <Icon>{authed ? <LogOut aria-hidden="true" /> : <LogIn aria-hidden="true" />}</Icon>
+                    <ItemText>
+                      {authed ? `Sign out ${p.name}` : `Sign in ${p.name}`}{" "}
+                      {authed && <span style={{ fontWeight: 800, color: "var(--duck-orange)" }}>•</span>}
+                    </ItemText>
+                  </ItemLeft>
+                  {authed && (
+                    <RightIcon title="Signed in">
+                      <ShieldCheck aria-hidden="true" />
                     </RightIcon>
                   )}
                 </MenuItem>

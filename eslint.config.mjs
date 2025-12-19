@@ -11,7 +11,8 @@ export default [
       "dist/**",
       "node_modules/**",
       "**/*.timestamp-*.mjs",
-      "**/vite.config.ts.timestamp-*.mjs"
+      "**/vite.config.ts.timestamp-*.mjs",
+      "vitest.config.ts"
     ]
   },
   js.configs.recommended,
