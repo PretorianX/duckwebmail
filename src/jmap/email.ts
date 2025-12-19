@@ -115,6 +115,27 @@ type BodyCacheEntry = {
 
 const emailBodyCache = new Map<string, BodyCacheEntry>();
 
+/**
+ * Build the JMAP filter object for Email/query.
+ * - If no search query is provided, just filter by mailbox.
+ * - If a search query is provided, use `text` for full-text search (most reliable).
+ */
+function buildEmailQueryFilter(mailboxId: string, query?: string, _includeBody?: boolean): Record<string, unknown> {
+  const trimmedQuery = (query ?? "").trim();
+  if (trimmedQuery === "") {
+    return { inMailbox: mailboxId };
+  }
+
+  // Use `text` for FTS - searches headers and body
+  return {
+    operator: "AND",
+    conditions: [
+      { inMailbox: mailboxId },
+      { text: trimmedQuery }
+    ]
+  };
+}
+
 export async function listEmailSummariesInMailbox(params: {
   apiUrl: string;
   authHeader: string;
@@ -122,9 +143,15 @@ export async function listEmailSummariesInMailbox(params: {
   mailboxId: string;
   limit?: number;
   force?: boolean;
+  /** Optional search query to filter by from/to/subject (and optionally body). */
+  query?: string;
+  /** If true, also search message body text. */
+  includeBody?: boolean;
 }): Promise<{ emails: JmapEmailSummary[]; total?: number; queryState?: string }> {
   const limit = params.limit ?? 50;
-  const cacheKey = `${params.apiUrl}|${params.accountId}|${params.mailboxId}|${limit}`;
+  const normalizedQuery = (params.query ?? "").trim().toLowerCase();
+  const bodyFlag = params.includeBody ? 1 : 0;
+  const cacheKey = `${params.apiUrl}|${params.accountId}|${params.mailboxId}|${limit}|q=${normalizedQuery}|body=${bodyFlag}`;
 
   if (!params.force) {
     const cached = emailListCache.get(cacheKey);
@@ -134,12 +161,14 @@ export async function listEmailSummariesInMailbox(params: {
   const queryCallId = generateCallId("emlq");
   const getCallId = generateCallId("emlg");
 
+  const filter = buildEmailQueryFilter(params.mailboxId, params.query, params.includeBody);
+
   const res = await jmapRequest(params.apiUrl, params.authHeader, [JMAP_CORE, JMAP_MAIL], [
     [
       "Email/query",
       {
         accountId: params.accountId,
-        filter: { inMailbox: params.mailboxId },
+        filter,
         sort: [{ property: "receivedAt", isAscending: false }],
         position: 0,
         limit

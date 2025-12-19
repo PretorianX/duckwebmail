@@ -43,6 +43,7 @@
   max-width: 520px;
   min-width: 0;
   display: flex;
+  align-items: center;
   justify-content: center;
 }
 
@@ -417,6 +418,37 @@
 .search:focus {
   border-color: rgba(255, 204, 0, 0.65);
   box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.22);
+}
+
+.searchBodyToggle {
+  flex-shrink: 0;
+  margin-left: 6px;
+  padding: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--card-background);
+  color: var(--light-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.searchBodyToggle:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.searchBodyToggleActive {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #121620;
+}
+
+.searchBodyToggleActive:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .composeButton {

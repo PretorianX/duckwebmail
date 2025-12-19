@@ -8,6 +8,7 @@ import {
   Clock,
   Download,
   FileDown,
+  FileText,
   Forward,
   LoaderCircle,
   Mail,
@@ -284,6 +285,8 @@ export default function MailPage() {
   const [bodyLoadingIds, setBodyLoadingIds] = useState<Set<string>>(() => new Set());
   const [bodyErrors, setBodyErrors] = useState<Record<string, string>>({});
   const [emailCopied, setEmailCopied] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchIncludeBody, setSearchIncludeBody] = useState(false);
   const activeProfileName = activeProfile.name;
   const [canDragFolders, setCanDragFolders] = useState(false);
   const canDragEmails = canDragFolders;
@@ -744,10 +747,15 @@ export default function MailPage() {
     }
   };
 
-  const loadMessages = async (opts?: { force?: boolean }) => {
+  const loadMessages = async (opts?: { force?: boolean; query?: string; includeBody?: boolean }) => {
     if (!auth) return;
     if (!folderId) return;
     const targetFolderId = folderId;
+    // Capture search params at call time to avoid stale closures
+    const q = opts?.query ?? searchQuery;
+    const body = opts?.includeBody ?? searchIncludeBody;
+    // Limit to 5 results when searching, 50 otherwise
+    const limit = q.trim() ? 5 : 50;
 
     setMessagesError(null);
     setMessagesLoading(true);
@@ -757,8 +765,10 @@ export default function MailPage() {
         authHeader: auth.authHeader,
         accountId: auth.accountId,
         mailboxId: targetFolderId,
-        limit: 50,
-        force: opts?.force
+        limit,
+        force: opts?.force,
+        query: q.trim() || undefined,
+        includeBody: body
       });
       // If user switched folders mid-request, ignore the result.
       if (targetFolderId !== folderId) return;
@@ -791,6 +801,32 @@ export default function MailPage() {
     void loadMessages({ force: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth?.accountId, auth?.authHeader, auth?.session.apiUrl, folderId]);
+
+  // --- Debounced search ---
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!auth) return;
+    if (!folderId) return;
+
+    // Clear any pending search timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+
+    // Debounce search requests (250ms)
+    searchTimeoutRef.current = setTimeout(() => {
+      void loadMessages({ force: true, query: searchQuery, includeBody: searchIncludeBody });
+    }, 250);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, searchIncludeBody]);
 
   // --- JMAP WebSocket Push ---
   useEffect(() => {
@@ -1537,8 +1573,21 @@ export default function MailPage() {
         <div className={styles.headerSearch}>
           <label className={styles.searchLabel}>
             <span className={styles.srOnly}>Search</span>
-            <input className={styles.search} placeholder="Search mail…" />
+            <input
+              className={styles.search}
+              placeholder="Search mail…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </label>
+          <button
+            type="button"
+            className={`${styles.searchBodyToggle} ${searchIncludeBody ? styles.searchBodyToggleActive : ""}`}
+            title={searchIncludeBody ? "Searching message text (click to disable)" : "Search message text"}
+            onClick={() => setSearchIncludeBody((prev) => !prev)}
+          >
+            <FileText className={styles.icon} aria-hidden="true" />
+          </button>
         </div>
         <div className={styles.headerActions}>
           {auth && (() => {
@@ -1831,7 +1880,7 @@ export default function MailPage() {
           {messagesLoading ? (
             <div className={styles.loadingState} aria-live="polite">
               <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
-              Loading emails…
+              {searchQuery.trim() ? "Searching…" : "Loading emails…"}
             </div>
           ) : messagesError ? (
             <div className={styles.errorState} role="alert">
@@ -1841,7 +1890,9 @@ export default function MailPage() {
               </button>
             </div>
           ) : messages.length === 0 ? (
-            <div className={styles.emptyState}>No emails in this folder.</div>
+            <div className={styles.emptyState}>
+              {searchQuery.trim() ? `No results for "${searchQuery.trim()}"` : "No emails in this folder."}
+            </div>
           ) : (
             messages.map((msg) => {
           const isOpen = expandedMessageId === msg.id;
