@@ -160,6 +160,34 @@ const roundToNextMinutes = (date: Date, stepMinutes: number) => {
   return new Date(Math.ceil(ms / stepMs) * stepMs);
 };
 
+const formatListArrivalTime = (receivedAtIso: string) => {
+  const receivedAt = new Date(receivedAtIso);
+  const now = new Date();
+  const isToday =
+    receivedAt.getFullYear() === now.getFullYear() &&
+    receivedAt.getMonth() === now.getMonth() &&
+    receivedAt.getDate() === now.getDate();
+
+  if (isToday) {
+    return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(receivedAt);
+  }
+
+  const sameYear = receivedAt.getFullYear() === now.getFullYear();
+  return new Intl.DateTimeFormat(undefined, {
+    ...(sameYear ? {} : { year: "2-digit" }),
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(receivedAt);
+};
+
+const getBimiInitial = (from: string) => {
+  // Demo BIMI placeholder: use the first letter we can find.
+  const match = from.trim().match(/[A-Za-z]/);
+  return (match?.[0] ?? "?").toUpperCase();
+};
+
 export default function MailPage() {
   const navigate = useNavigate();
   const sendMenuRef = useRef<HTMLDivElement | null>(null);
@@ -595,14 +623,12 @@ export default function MailPage() {
                 }}
               >
                 <div className={styles.rowGrid}>
+                  <div className={styles.bimi} aria-hidden="true" title="BIMI">
+                    {getBimiInitial(msg.from)}
+                  </div>
                   <div className={`${styles.from} ${msg.unread ? styles.unreadText : ""}`}>{msg.from}</div>
                   <div className={styles.summary}>
                     <span className={`${styles.subject} ${msg.unread ? styles.unreadText : ""}`}>{msg.subject}</span>
-                    <span className={styles.summarySep} aria-hidden="true">
-                      {" "}
-                      —{" "}
-                    </span>
-                    <span className={styles.preview}>{msg.preview}</span>
                   </div>
                   <div className={styles.rightCell} onClick={(e) => e.stopPropagation()}>
                     {showActions ? (
@@ -683,6 +709,9 @@ export default function MailPage() {
                       </div>
                     ) : (
                       <div className={styles.rightMeta}>
+                        <div className={styles.date} title={new Date(msg.receivedAt).toLocaleString()}>
+                          {formatListArrivalTime(msg.receivedAt)}
+                        </div>
                         {msg.attachments.length > 0 && (
                           <div
                             className={styles.attachmentIndicator}
@@ -693,7 +722,6 @@ export default function MailPage() {
                             <span className={styles.attachmentIndicatorCount}>{msg.attachments.length}</span>
                           </div>
                         )}
-                        <div className={styles.date}>{new Date(msg.receivedAt).toLocaleString()}</div>
                       </div>
                     )}
                   </div>
