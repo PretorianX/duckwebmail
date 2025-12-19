@@ -612,6 +612,44 @@
   gap: 6px;
 }
 
+.rightMetaActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.moreButton {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rowGroupOpen .moreButton,
+.row:hover .moreButton,
+.row:focus .moreButton,
+.row:focus-visible .moreButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.toLineButton {
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.88rem;
+}
+
+.toLineButton:hover {
+  text-decoration: underline;
+}
+
 .attachmentIndicator {
   display: none;
   align-items: center;
@@ -791,6 +829,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .attachmentChip:hover {
@@ -804,6 +843,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 850;
+  min-width: 0;
 }
 
 .attachmentSize {
@@ -1377,14 +1417,31 @@
   }
 
   .expandedSecondRow {
-    flex-wrap: wrap;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+  }
+
+  .toLineButton {
+    flex: 1 1 auto;
+    font-size: 0.84rem;
   }
 
   .downloadRow {
-    flex-wrap: wrap;
-    justify-content: flex-end;
     margin-left: auto;
+    flex: 0 0 auto;
+  }
+
+  .attachments {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .attachmentChip {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 

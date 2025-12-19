@@ -24,7 +24,6 @@ import ThemeToggle from "../theme/ThemeToggle";
 import ProfileMenu from "../shared/ProfileMenu";
 import SafeEmailViewer from "../shared/SafeEmailViewer";
 import ComposeEditor from "../shared/ComposeEditor";
-import { useMediaQuery } from "../shared/useMediaQuery";
 import styles from "./mail.module.css";
 
 type Folder = { id: string; name: string; unread: number; parentId?: string | null };
@@ -49,6 +48,34 @@ type Message = {
   html?: string;
   text?: string;
 };
+
+type Profile = { id: string; name: string };
+const STORAGE_ACTIVE_PROFILE = "activeProfileId";
+const STORAGE_PROFILES = "profiles";
+
+function readProfiles(): Profile[] {
+  const raw = localStorage.getItem(STORAGE_PROFILES);
+  if (!raw) return [{ id: "personal", name: "Personal" }, { id: "work", name: "Work" }];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [{ id: "personal", name: "Personal" }, { id: "work", name: "Work" }];
+    const normalized = parsed
+      .map((p) => (typeof p === "object" && p ? (p as { id?: unknown; name?: unknown }) : null))
+      .filter(Boolean)
+      .map((p) => ({ id: String(p!.id ?? ""), name: String(p!.name ?? "") }))
+      .filter((p) => p.id.length > 0 && p.name.length > 0);
+    return normalized.length > 0 ? normalized : [{ id: "personal", name: "Personal" }, { id: "work", name: "Work" }];
+  } catch {
+    return [{ id: "personal", name: "Personal" }, { id: "work", name: "Work" }];
+  }
+}
+
+function readActiveProfileName(): string {
+  const profiles = readProfiles();
+  const raw = localStorage.getItem(STORAGE_ACTIVE_PROFILE);
+  const active = raw && profiles.some((p) => p.id === raw) ? raw : profiles[0]?.id ?? "personal";
+  return profiles.find((p) => p.id === active)?.name ?? "Personal";
+}
 
 const demoFolders: Folder[] = [
   { id: "inbox", name: "Inbox", unread: 3, parentId: null },
@@ -195,25 +222,24 @@ export default function MailPage() {
   const sendMenuRef = useRef<HTMLDivElement | null>(null);
   const attachmentsInputRef = useRef<HTMLInputElement | null>(null);
   const scheduledForInputRef = useRef<HTMLInputElement | null>(null);
-  const compactRowActions = useMediaQuery("(max-width: 420px)");
   const [folderId, setFolderId] = useState(demoFolders[0].id);
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
   const [folderQuery, setFolderQuery] = useState("");
   const [openFolderIds, setOpenFolderIds] = useState<Set<string>>(() => new Set(["inbox", "archive"]));
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [expandedAttachmentIds, setExpandedAttachmentIds] = useState<Set<string>>(() => new Set());
-  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
-  const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeMinimized, setComposeMinimized] = useState(false);
   const [composeCancelConfirmOpen, setComposeCancelConfirmOpen] = useState(false);
   const [rowActionsMessageId, setRowActionsMessageId] = useState<string | null>(null);
+  const [expandedToIds, setExpandedToIds] = useState<Set<string>>(() => new Set());
   const [composeDraft, setComposeDraft] = useState<ComposeDraft>({ to: "", subject: "", body: "" });
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledFor, setScheduledFor] = useState<string>("");
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [messages, setMessages] = useState<Message[]>(() => demoMessages);
+  const activeProfileName = useMemo(() => readActiveProfileName(), []);
 
   const folderIndex = useMemo(() => {
     const byId = new Map<string, Folder>();
@@ -581,19 +607,9 @@ export default function MailPage() {
         </header>
 
         <section className={styles.list} aria-label="Message list">
-          <div className={styles.listHeader}>
-            <div className={styles.listTitle}>
-              <span className={styles.listTitleDuck} aria-hidden="true">
-                🦆
-              </span>{" "}
-              {folder.name}
-            </div>
-          </div>
-
         {messages.map((msg) => {
           const isOpen = expandedIds.has(msg.id);
           const regionId = `message-body-${msg.id}`;
-          const showActions = hoveredMessageId === msg.id || focusedMessageId === msg.id;
           return (
             <div key={msg.id} className={`${styles.rowGroup} ${isOpen ? styles.rowGroupOpen : ""}`}>
               <div
@@ -604,27 +620,6 @@ export default function MailPage() {
                 aria-controls={regionId}
                 aria-label={`Open ${msg.subject}`}
                 onClick={() => toggleExpanded(msg.id)}
-                onMouseOver={() => setHoveredMessageId(msg.id)}
-                onMouseOut={(e) => {
-                  const related = e.relatedTarget;
-                  if (related === null) return;
-                  if (related instanceof Node && e.currentTarget.contains(related)) return;
-                  setHoveredMessageId((prev) => (prev === msg.id ? null : prev));
-                }}
-                onFocusCapture={() => {
-                  setFocusedMessageId(msg.id);
-                  setHoveredMessageId(msg.id);
-                }}
-                onBlurCapture={(e) => {
-                  const related = e.relatedTarget;
-                  if (!(related instanceof Node)) {
-                    setFocusedMessageId((prev) => (prev === msg.id ? null : prev));
-                    return;
-                  }
-                  if (!e.currentTarget.contains(related)) {
-                    setFocusedMessageId((prev) => (prev === msg.id ? null : prev));
-                  }
-                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
@@ -641,105 +636,11 @@ export default function MailPage() {
                     <span className={`${styles.subject} ${msg.unread ? styles.unreadText : ""}`}>{msg.subject}</span>
                   </div>
                   <div className={styles.rightCell} onClick={(e) => e.stopPropagation()}>
-                    {showActions ? (
-                      <div className={styles.actions} aria-label={`Actions ${msg.subject}`}>
-                        <button
-                          type="button"
-                          className={styles.iconButton}
-                          aria-label={`Reply ${msg.subject}`}
-                          title="Reply"
-                          onClick={() => {
-                            setHoveredMessageId(msg.id);
-                            setFocusedMessageId(msg.id);
-                            beginCompose({ to: msg.from, subject: `Re: ${msg.subject}`, body: "" });
-                          }}
-                        >
-                          <Reply className={styles.icon} aria-hidden="true" />
-                        </button>
-
-                        <button
-                          type="button"
-                          className={styles.iconButton}
-                          aria-label={`Forward ${msg.subject}`}
-                          title="Forward"
-                          onClick={() => {
-                            setHoveredMessageId(msg.id);
-                            setFocusedMessageId(msg.id);
-                            beginCompose({ to: "", subject: `Fwd: ${msg.subject}`, body: msg.text ?? "" });
-                          }}
-                        >
-                          <Forward className={styles.icon} aria-hidden="true" />
-                        </button>
-
-                        {compactRowActions ? (
-                          <button
-                            type="button"
-                            className={styles.iconButton}
-                            aria-label={`More actions ${msg.subject}`}
-                            title="More actions"
-                            onClick={() => setRowActionsMessageId(msg.id)}
-                          >
-                            <MoreHorizontal className={styles.icon} aria-hidden="true" />
-                          </button>
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              className={`${styles.iconButton} ${msg.starred ? styles.iconButtonActive : ""}`}
-                              aria-label={`${msg.starred ? "Unstar" : "Star"} ${msg.subject}`}
-                              title={msg.starred ? "Unstar" : "Star"}
-                              onClick={() => {
-                                setHoveredMessageId(msg.id);
-                                setFocusedMessageId(msg.id);
-                                toggleStar(msg.id);
-                              }}
-                            >
-                              <Star
-                                className={styles.icon}
-                                aria-hidden="true"
-                                fill={msg.starred ? "currentColor" : "none"}
-                              />
-                            </button>
-
-                            <button
-                              type="button"
-                              className={styles.iconButton}
-                              aria-label={`Mark ${msg.unread ? "read" : "unread"} ${msg.subject}`}
-                              title={msg.unread ? "Mark read" : "Mark unread"}
-                              onClick={() => {
-                                setHoveredMessageId(msg.id);
-                                setFocusedMessageId(msg.id);
-                                toggleUnread(msg.id);
-                              }}
-                            >
-                              {msg.unread ? (
-                                <MailOpen className={styles.icon} aria-hidden="true" />
-                              ) : (
-                                <Mail className={styles.icon} aria-hidden="true" />
-                              )}
-                            </button>
-
-                            <button
-                              type="button"
-                              className={`${styles.iconButton} ${styles.dangerButton}`}
-                              aria-label={`Delete ${msg.subject}`}
-                              title="Delete"
-                              onClick={() => {
-                                setHoveredMessageId(msg.id);
-                                setFocusedMessageId(msg.id);
-                                deleteMessage(msg.id);
-                              }}
-                            >
-                              <Trash2 className={styles.icon} aria-hidden="true" />
-                            </button>
-                          </>
-                        )}
+                    <div className={styles.rightMeta}>
+                      <div className={styles.date} title={new Date(msg.receivedAt).toLocaleString()}>
+                        {formatListArrivalTime(msg.receivedAt)}
                       </div>
-                    ) : (
-                      <div className={styles.rightMeta}>
-                        <div className={styles.date} title={new Date(msg.receivedAt).toLocaleString()}>
-                          {formatListArrivalTime(msg.receivedAt)}
-                        </div>
+                      <div className={styles.rightMetaActions}>
                         {msg.attachments.length > 0 && (
                           <div
                             className={styles.attachmentIndicator}
@@ -750,8 +651,17 @@ export default function MailPage() {
                             <span className={styles.attachmentIndicatorCount}>{msg.attachments.length}</span>
                           </div>
                         )}
+                        <button
+                          type="button"
+                          className={`${styles.iconButton} ${styles.moreButton}`}
+                          aria-label={`More actions ${msg.subject}`}
+                          title="More actions"
+                          onClick={() => setRowActionsMessageId(msg.id)}
+                        >
+                          <MoreHorizontal className={styles.icon} aria-hidden="true" />
+                        </button>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -774,20 +684,22 @@ export default function MailPage() {
                 </div>
 
                 <div className={styles.expandedSecondRow}>
-                  <div className={styles.toLine}>
-                    <span className={styles.metaLabel}>To:</span> {msg.to}
-                  </div>
+                  <button
+                    type="button"
+                    className={styles.toLineButton}
+                    title={expandedToIds.has(msg.id) ? "Hide full To header" : "Show full To header"}
+                    onClick={() =>
+                      setExpandedToIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(msg.id)) next.delete(msg.id);
+                        else next.add(msg.id);
+                        return next;
+                      })
+                    }
+                  >
+                    <span className={styles.metaLabel}>To:</span> {expandedToIds.has(msg.id) ? msg.to : activeProfileName}
+                  </button>
                   <div className={styles.downloadRow}>
-                    <button
-                      type="button"
-                      className={styles.iconButton}
-                      aria-label={`Download source ${msg.subject}`}
-                      title="Download source (.eml)"
-                      onClick={() => triggerDownload(`${msg.subject}.eml`, "message/rfc822", msg.rawSource)}
-                    >
-                      <FileDown className={styles.icon} aria-hidden="true" />
-                    </button>
-
                     {msg.attachments.length > 0 && (
                       <button
                         type="button"
@@ -925,6 +837,20 @@ export default function MailPage() {
                     <Mail className={styles.icon} aria-hidden="true" />
                   )}
                   {rowActionsMessage.unread ? "Mark read" : "Mark unread"}
+                </span>
+              </button>
+
+              <button
+                className={styles.sendMenuItem}
+                type="button"
+                onClick={() => {
+                  triggerDownload(`${rowActionsMessage.subject}.eml`, "message/rfc822", rowActionsMessage.rawSource);
+                  setRowActionsMessageId(null);
+                }}
+              >
+                <span className={styles.sendMenuItemRow}>
+                  <FileDown className={styles.icon} aria-hidden="true" />
+                  Download source (.eml)
                 </span>
               </button>
 
