@@ -30,12 +30,15 @@ import { useAuth } from "../auth/AuthContext";
 import { createMailbox, deleteMailbox, getMailboxes, moveMailbox, renameMailbox, type JmapMailbox } from "../jmap/mailbox";
 import {
   clearEmailListCacheForAccount,
+  destroyEmail,
   formatAddressList,
   getEmailBody,
   isStarred,
   isUnread,
   listEmailSummariesInMailbox,
   markEmailAsRead,
+  markEmailAsUnread,
+  setEmailStarred,
   type JmapEmailSummary
 } from "../jmap/email";
 import { JmapPushClient, stateChangeAffectsAccount, type StateChange } from "../jmap/webSocketPush";
@@ -921,21 +924,108 @@ export default function MailPage() {
   };
 
   const toggleStar = (messageId: string) => {
-    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, starred: !m.starred } : m)));
+    const run = async () => {
+      if (!auth) return;
+      const current = messages.find((m) => m.id === messageId);
+      if (!current) return;
+      const nextStarred = !current.starred;
+
+      // Optimistic update.
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, starred: nextStarred } : m)));
+
+      const ok = await setEmailStarred({
+        apiUrl: auth.session.apiUrl,
+        authHeader: auth.authHeader,
+        accountId: auth.accountId,
+        emailId: messageId,
+        starred: nextStarred
+      });
+
+      if (!ok) {
+        // Revert on failure.
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, starred: !nextStarred } : m)));
+        return;
+      }
+
+      clearEmailListCacheForAccount({ apiUrl: auth.session.apiUrl, accountId: auth.accountId });
+      void loadMessages({ force: true });
+    };
+
+    void run();
   };
 
   const toggleUnread = (messageId: string) => {
-    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, unread: !m.unread } : m)));
+    const run = async () => {
+      if (!auth) return;
+      const current = messages.find((m) => m.id === messageId);
+      if (!current) return;
+      const nextUnread = !current.unread;
+
+      // Optimistic update.
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, unread: nextUnread } : m)));
+
+      const ok = nextUnread
+        ? await markEmailAsUnread({
+            apiUrl: auth.session.apiUrl,
+            authHeader: auth.authHeader,
+            accountId: auth.accountId,
+            emailId: messageId
+          })
+        : await markEmailAsRead({
+            apiUrl: auth.session.apiUrl,
+            authHeader: auth.authHeader,
+            accountId: auth.accountId,
+            emailId: messageId
+          });
+
+      if (!ok) {
+        // Revert on failure.
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, unread: !nextUnread } : m)));
+        return;
+      }
+
+      clearEmailListCacheForAccount({ apiUrl: auth.session.apiUrl, accountId: auth.accountId });
+      void loadMessages({ force: true });
+      void loadMailboxes({ force: true }); // update unread counts
+    };
+
+    void run();
   };
 
   const deleteMessage = (messageId: string) => {
-    setMessages((prev) => prev.filter((m) => m.id !== messageId));
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(messageId);
-      return next;
-    });
-    setRowActionsMessageId((prev) => (prev === messageId ? null : prev));
+    const run = async () => {
+      if (!auth) return;
+      const existing = messages.find((m) => m.id === messageId);
+      if (!existing) return;
+
+      // Optimistic removal.
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(messageId);
+        return next;
+      });
+      setRowActionsMessageId((prev) => (prev === messageId ? null : prev));
+
+      const ok = await destroyEmail({
+        apiUrl: auth.session.apiUrl,
+        authHeader: auth.authHeader,
+        accountId: auth.accountId,
+        emailId: messageId
+      });
+
+      if (!ok) {
+        // Reinsert (best-effort) on failure.
+        setMessages((prev) => [existing, ...prev]);
+        return;
+      }
+
+      clearEmailListCacheForAccount({ apiUrl: auth.session.apiUrl, accountId: auth.accountId });
+      void loadMessages({ force: true });
+      void loadMailboxes({ force: true }); // update counts
+    };
+
+    void run();
   };
 
   const rowActionsMessage = useMemo(

@@ -248,6 +248,8 @@ export function isStarred(keywords: Record<string, boolean> | undefined): boolea
   return !!(keywords && keywords["$flagged"] === true);
 }
 
+type KeywordValue = boolean | null;
+
 /**
  * Mark an email as read by setting the $seen keyword.
  * Returns true if the update succeeded.
@@ -277,6 +279,110 @@ export async function markEmailAsRead(params: {
   const errText = getErrorText(res.methodResponses);
   if (errText) {
     console.error("[JMAP] markEmailAsRead failed:", errText);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Mark an email as unread by removing the $seen keyword.
+ * Returns true if the update succeeded.
+ */
+export async function markEmailAsUnread(params: {
+  apiUrl: string;
+  authHeader: string;
+  accountId: string;
+  emailId: string;
+}): Promise<boolean> {
+  const callId = generateCallId("unseen");
+  const res = await jmapRequest(params.apiUrl, params.authHeader, [JMAP_CORE, JMAP_MAIL], [
+    [
+      "Email/set",
+      {
+        accountId: params.accountId,
+        update: {
+          [params.emailId]: {
+            // PatchObject: set to null to remove the keyword key from the map.
+            "keywords/$seen": null as KeywordValue
+          }
+        }
+      },
+      callId
+    ]
+  ]);
+
+  const errText = getErrorText(res.methodResponses);
+  if (errText) {
+    console.error("[JMAP] markEmailAsUnread failed:", errText);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Set/unset $flagged keyword (star).
+ * Returns true if the update succeeded.
+ */
+export async function setEmailStarred(params: {
+  apiUrl: string;
+  authHeader: string;
+  accountId: string;
+  emailId: string;
+  starred: boolean;
+}): Promise<boolean> {
+  const callId = generateCallId("flag");
+  const keywordPatch: KeywordValue = params.starred ? true : null;
+  const res = await jmapRequest(params.apiUrl, params.authHeader, [JMAP_CORE, JMAP_MAIL], [
+    [
+      "Email/set",
+      {
+        accountId: params.accountId,
+        update: {
+          [params.emailId]: {
+            "keywords/$flagged": keywordPatch
+          }
+        }
+      },
+      callId
+    ]
+  ]);
+
+  const errText = getErrorText(res.methodResponses);
+  if (errText) {
+    console.error("[JMAP] setEmailStarred failed:", errText);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Permanently delete an email by destroying it.
+ * Returns true if the destroy succeeded.
+ */
+export async function destroyEmail(params: {
+  apiUrl: string;
+  authHeader: string;
+  accountId: string;
+  emailId: string;
+}): Promise<boolean> {
+  const callId = generateCallId("edel");
+  const res = await jmapRequest(params.apiUrl, params.authHeader, [JMAP_CORE, JMAP_MAIL], [
+    [
+      "Email/set",
+      {
+        accountId: params.accountId,
+        destroy: [params.emailId]
+      },
+      callId
+    ]
+  ]);
+
+  const errText = getErrorText(res.methodResponses);
+  if (errText) {
+    console.error("[JMAP] destroyEmail failed:", errText);
     return false;
   }
 
