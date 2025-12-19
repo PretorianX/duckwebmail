@@ -695,6 +695,14 @@
   cursor: pointer;
 }
 
+.rowDraggable {
+  cursor: grab;
+}
+
+.rowDraggable:active {
+  cursor: grabbing;
+}
+
 .row:hover {
   background: rgba(255, 204, 0, 0.06);
 }

@@ -39,6 +39,7 @@ import {
   isStarred,
   isUnread,
   listEmailSummariesInMailbox,
+  moveEmailToMailbox,
   markEmailAsRead,
   markEmailAsUnread,
   setEmailStarred,
@@ -237,6 +238,8 @@ export default function MailPage() {
   const attachmentsInputRef = useRef<HTMLInputElement | null>(null);
   const scheduledForInputRef = useRef<HTMLInputElement | null>(null);
   const [folderId, setFolderId] = useState<string>("");
+  // Keep a ref to the current folderId so event callbacks always see the latest value.
+  const folderIdRef = useRef(folderId);
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
   const [folderQuery, setFolderQuery] = useState("");
   const [openFolderIds, setOpenFolderIds] = useState<Set<string>>(() => new Set());
@@ -244,6 +247,8 @@ export default function MailPage() {
   const [folderUiError, setFolderUiError] = useState<string | null>(null);
   const [draggingFolderId, setDraggingFolderId] = useState<string | null>(null);
   const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null);
+  const [draggingEmailId, setDraggingEmailId] = useState<string | null>(null);
+  const [draggingEmailFromFolderId, setDraggingEmailFromFolderId] = useState<string | null>(null);
   const [folderOpMode, setFolderOpMode] = useState<"create" | "rename" | "delete" | null>(null);
   const [folderOpTargetId, setFolderOpTargetId] = useState<string | null>(null);
   const [folderOpBusy, setFolderOpBusy] = useState(false);
@@ -276,6 +281,7 @@ export default function MailPage() {
   const [emailCopied, setEmailCopied] = useState(false);
   const activeProfileName = activeProfile.name;
   const [canDragFolders, setCanDragFolders] = useState(false);
+  const canDragEmails = canDragFolders;
 
   useEffect(() => {
     const media = window.matchMedia("(pointer: fine) and (hover: hover)");
@@ -674,7 +680,51 @@ export default function MailPage() {
     // Switching folder should never keep old expanded state around.
     setExpandedIds(new Set());
     setExpandedAttachmentIds(new Set());
+    setDraggingEmailId(null);
+    setDraggingEmailFromFolderId(null);
+    setDropTargetFolderId(null);
   }, [folderId]);
+
+  const performMoveEmail = async (params: { emailId: string; fromFolderId: string; toFolderId: string }) => {
+    if (!auth) return;
+    if (params.fromFolderId === params.toFolderId) return;
+    try {
+      await moveEmailToMailbox({
+        apiUrl: auth.session.apiUrl,
+        authHeader: auth.authHeader,
+        accountId: auth.accountId,
+        emailId: params.emailId,
+        fromMailboxId: params.fromFolderId,
+        toMailboxId: params.toFolderId
+      });
+
+      // Optimistic local update: remove from the currently viewed folder list.
+      if (folderIdRef.current === params.fromFolderId) {
+        setMessages((prev) => prev.filter((m) => m.id !== params.emailId));
+        setMessagesTotal((prev) => (typeof prev === "number" ? Math.max(0, prev - 1) : prev));
+        setExpandedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(params.emailId);
+          return next;
+        });
+        setExpandedAttachmentIds((prev) => {
+          const next = new Set(prev);
+          next.delete(params.emailId);
+          return next;
+        });
+        setExpandedToIds((prev) => {
+          const next = new Set(prev);
+          next.delete(params.emailId);
+          return next;
+        });
+      }
+
+      // Folder unread/total counts can change; refresh in the background.
+      void loadMailboxes({ force: true });
+    } catch (err) {
+      showFolderUiError(err instanceof Error ? err.message : "Failed to move email");
+    }
+  };
 
   const loadMessages = async (opts?: { force?: boolean }) => {
     if (!auth) return;
@@ -725,8 +775,6 @@ export default function MailPage() {
   }, [auth?.accountId, auth?.authHeader, auth?.session.apiUrl, folderId]);
 
   // --- JMAP WebSocket Push ---
-  // Keep a ref to the current folderId so the callback always sees the latest value.
-  const folderIdRef = useRef(folderId);
   useEffect(() => {
     folderIdRef.current = folderId;
   }, [folderId]);
@@ -1350,10 +1398,15 @@ export default function MailPage() {
             role="tree"
             aria-label="Folders"
             onDragOver={(e) => {
-              if (!canDragFolders) return;
-              if (!draggingFolderId) return;
-              e.preventDefault();
-              e.dataTransfer.dropEffect = "move";
+              if (canDragFolders && draggingFolderId) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                return;
+              }
+              if (canDragEmails && draggingEmailId) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }
             }}
             onDrop={(e) => {
               if (!canDragFolders) return;
@@ -1420,25 +1473,47 @@ export default function MailPage() {
                             setDropTargetFolderId(null);
                           }}
                           onDragEnter={(e) => {
-                            if (!canDragFolders) return;
-                            if (!draggingFolderId) return;
-                            e.preventDefault();
-                            setDropTargetFolderId(f.id);
+                            if (canDragFolders && draggingFolderId) {
+                              e.preventDefault();
+                              setDropTargetFolderId(f.id);
+                              return;
+                            }
+                            if (canDragEmails && draggingEmailId) {
+                              e.preventDefault();
+                              setDropTargetFolderId(f.id);
+                            }
                           }}
                           onDragOver={(e) => {
-                            if (!canDragFolders) return;
-                            if (!draggingFolderId) return;
-                            e.preventDefault();
-                            e.dataTransfer.dropEffect = "move";
+                            if (canDragFolders && draggingFolderId) {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = "move";
+                              return;
+                            }
+                            if (canDragEmails && draggingEmailId) {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = "move";
+                            }
                           }}
                           onDrop={(e) => {
-                            if (!canDragFolders) return;
                             e.preventDefault();
                             e.stopPropagation();
-                            const dragId = draggingFolderId ?? e.dataTransfer.getData("text/plain");
-                            setDraggingFolderId(null);
-                            setDropTargetFolderId(null);
-                            void performMoveFolder(dragId, f.id);
+
+                            if (canDragFolders && draggingFolderId) {
+                              const dragId = draggingFolderId ?? e.dataTransfer.getData("text/plain");
+                              setDraggingFolderId(null);
+                              setDropTargetFolderId(null);
+                              void performMoveFolder(dragId, f.id);
+                              return;
+                            }
+
+                            if (canDragEmails && draggingEmailId) {
+                              const emailId = draggingEmailId;
+                              const fromFolderId = draggingEmailFromFolderId ?? folderIdRef.current;
+                              setDraggingEmailId(null);
+                              setDraggingEmailFromFolderId(null);
+                              setDropTargetFolderId(null);
+                              void performMoveEmail({ emailId, fromFolderId, toFolderId: f.id });
+                            }
                           }}
                           onClick={() => setFolderId(f.id)}
                           onKeyDown={(e) => {
@@ -1574,12 +1649,26 @@ export default function MailPage() {
           return (
             <div key={msg.id} className={`${styles.rowGroup} ${isOpen ? styles.rowGroupOpen : ""}`}>
               <div
-                className={`${styles.row} ${isOpen ? styles.rowOpen : ""}`}
+                className={`${styles.row} ${canDragEmails ? styles.rowDraggable : ""} ${isOpen ? styles.rowOpen : ""}`}
                 role="button"
                 tabIndex={0}
                 aria-expanded={isOpen}
                 aria-controls={regionId}
                 aria-label={`Open ${msg.subject}`}
+                draggable={canDragEmails}
+                onDragStart={(e) => {
+                  if (!canDragEmails) return;
+                  setDraggingEmailId(msg.id);
+                  setDraggingEmailFromFolderId(folderIdRef.current);
+                  e.dataTransfer.setData("application/x-duckwebmail-email", msg.id);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onDragEnd={() => {
+                  if (!canDragEmails) return;
+                  setDraggingEmailId(null);
+                  setDraggingEmailFromFolderId(null);
+                  setDropTargetFolderId(null);
+                }}
                 onClick={() => toggleExpanded(msg.id)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -2040,10 +2129,15 @@ export default function MailPage() {
                 role="tree"
                 aria-label="Folders"
                 onDragOver={(e) => {
-                  if (!canDragFolders) return;
-                  if (!draggingFolderId) return;
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
+                  if (canDragFolders && draggingFolderId) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    return;
+                  }
+                  if (canDragEmails && draggingEmailId) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                  }
                 }}
                 onDrop={(e) => {
                   if (!canDragFolders) return;
@@ -2110,25 +2204,47 @@ export default function MailPage() {
                                 setDropTargetFolderId(null);
                               }}
                               onDragEnter={(e) => {
-                                if (!canDragFolders) return;
-                                if (!draggingFolderId) return;
-                                e.preventDefault();
-                                setDropTargetFolderId(f.id);
+                                if (canDragFolders && draggingFolderId) {
+                                  e.preventDefault();
+                                  setDropTargetFolderId(f.id);
+                                  return;
+                                }
+                                if (canDragEmails && draggingEmailId) {
+                                  e.preventDefault();
+                                  setDropTargetFolderId(f.id);
+                                }
                               }}
                               onDragOver={(e) => {
-                                if (!canDragFolders) return;
-                                if (!draggingFolderId) return;
-                                e.preventDefault();
-                                e.dataTransfer.dropEffect = "move";
+                                if (canDragFolders && draggingFolderId) {
+                                  e.preventDefault();
+                                  e.dataTransfer.dropEffect = "move";
+                                  return;
+                                }
+                                if (canDragEmails && draggingEmailId) {
+                                  e.preventDefault();
+                                  e.dataTransfer.dropEffect = "move";
+                                }
                               }}
                               onDrop={(e) => {
-                                if (!canDragFolders) return;
                                 e.preventDefault();
                                 e.stopPropagation();
-                                const dragId = draggingFolderId ?? e.dataTransfer.getData("text/plain");
-                                setDraggingFolderId(null);
-                                setDropTargetFolderId(null);
-                                void performMoveFolder(dragId, f.id);
+
+                                if (canDragFolders && draggingFolderId) {
+                                  const dragId = draggingFolderId ?? e.dataTransfer.getData("text/plain");
+                                  setDraggingFolderId(null);
+                                  setDropTargetFolderId(null);
+                                  void performMoveFolder(dragId, f.id);
+                                  return;
+                                }
+
+                                if (canDragEmails && draggingEmailId) {
+                                  const emailId = draggingEmailId;
+                                  const fromFolderId = draggingEmailFromFolderId ?? folderIdRef.current;
+                                  setDraggingEmailId(null);
+                                  setDraggingEmailFromFolderId(null);
+                                  setDropTargetFolderId(null);
+                                  void performMoveEmail({ emailId, fromFolderId, toFolderId: f.id });
+                                }
                               }}
                               onClick={() => setFolderId(f.id)}
                               onKeyDown={(e) => {

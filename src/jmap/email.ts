@@ -389,6 +389,49 @@ export async function destroyEmail(params: {
   return true;
 }
 
+type MailboxIdPatchValue = boolean | null;
+
+/**
+ * Move an email from one mailbox to another (remove from "fromMailboxId", add to "toMailboxId").
+ *
+ * Note: JMAP allows an Email to be in multiple mailboxes. This function performs a "move"
+ * semantics (remove from source, add to destination).
+ */
+export async function moveEmailToMailbox(params: {
+  apiUrl: string;
+  authHeader: string;
+  accountId: string;
+  emailId: string;
+  fromMailboxId: string;
+  toMailboxId: string;
+}): Promise<void> {
+  if (params.fromMailboxId === params.toMailboxId) return;
+
+  const callId = generateCallId("emlmove");
+  const res = await jmapRequest(params.apiUrl, params.authHeader, [JMAP_CORE, JMAP_MAIL], [
+    [
+      "Email/set",
+      {
+        accountId: params.accountId,
+        update: {
+          [params.emailId]: {
+            // PatchObject: set to null to remove mailboxIds key from the map.
+            [`mailboxIds/${params.fromMailboxId}`]: null as MailboxIdPatchValue,
+            [`mailboxIds/${params.toMailboxId}`]: true as MailboxIdPatchValue
+          }
+        }
+      },
+      callId
+    ]
+  ]);
+
+  const errText = getErrorText(res.methodResponses);
+  if (errText) throw new Error(`Move email failed: ${errText}`);
+
+  // Ensure subsequent list loads are fresh (push may arrive later / not at all on some servers).
+  clearEmailListCacheForAccount({ apiUrl: params.apiUrl, accountId: params.accountId });
+}
+
 /**
  * Clear the email list cache (e.g. when a StateChange is received).
  */

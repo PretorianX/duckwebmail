@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Refine desktop layout: pin Inbox first in folder list (then role/system folders, then alphabetical), move search to header left, remove sidebar profile duplication and sign-out button, add thin footer with JMAP quota usage and copyright.
+- Add desktop drag & drop: move emails to folders by dragging a message onto a folder in the sidebar.
 - Add CSS "theme schemes" layer (via `data-scheme`) + compose editor defaults driven by `--compose-*` variables; no layout/spacing changes.
 - Add `pure-email` scheme (teal + gray palette) and allow Docker Compose to define default theme/scheme via `VITE_DEFAULT_THEME` / `VITE_DEFAULT_SCHEME`.
 - Persist auth per profile (Personal/Work) in localStorage and rehydrate JMAP sessions on app startup so page reloads don't log you out; support switching profiles without losing the other session.
