@@ -1,5 +1,7 @@
 import { createGlobalStyle } from "styled-components";
 
+import { schemeCss } from "./schemes";
+
 const GlobalStyle = createGlobalStyle`
   :root {
     /* Light theme variables (taken from hide-mail_styles) */
@@ -20,6 +22,24 @@ const GlobalStyle = createGlobalStyle`
     --duck-gray: #f0f0f0;
     --duck-white: #ffffff;
     --duck-yellow: #ffde59;
+
+    /* Compose defaults (schemes may override) */
+    --compose-bg: var(--card-background);
+    --compose-text-color: var(--text-color);
+    --compose-muted-color: var(--light-text);
+    --compose-border-color: var(--border-color);
+    --compose-link-color: var(--primary-color);
+    --compose-caret-color: var(--text-color);
+
+    /* Typography defaults for compose (schemes may override) */
+    --compose-font-family: inherit;
+    --compose-font-size: 16px;
+    --compose-line-height: 1.45;
+
+    /* Visual tokens for compose (schemes may override) */
+    --compose-toolbar-bg: rgba(255, 204, 0, 0.06);
+    --compose-quote-bg: rgba(255, 204, 0, 0.06);
+    --compose-quote-border: rgba(255, 204, 0, 0.9);
   }
 
   [data-theme='dark'] {
@@ -44,6 +64,8 @@ const GlobalStyle = createGlobalStyle`
     --dark-border: #3a4556;
     --dark-button-text: #121620;
   }
+
+${schemeCss}
 
   * {
     box-sizing: border-box;

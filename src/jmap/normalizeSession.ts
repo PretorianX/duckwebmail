@@ -86,3 +86,22 @@ export function getPrimaryMailAccountId(session: JmapSession): string | null {
   const firstAccountId = Object.keys(session.accounts)[0];
   return firstAccountId ?? null;
 }
+
+export function getPrimarySubmissionAccountId(session: JmapSession): string | null {
+  // Try primaryAccounts first
+  if (session.primaryAccounts) {
+    const submissionAccountId = session.primaryAccounts["urn:ietf:params:jmap:submission"];
+    if (submissionAccountId && session.accounts[submissionAccountId]) {
+      return submissionAccountId;
+    }
+  }
+
+  // Otherwise pick an account that advertises the submission capability.
+  for (const [accountId, account] of Object.entries(session.accounts)) {
+    if (account.accountCapabilities?.["urn:ietf:params:jmap:submission"]) {
+      return accountId;
+    }
+  }
+
+  return null;
+}

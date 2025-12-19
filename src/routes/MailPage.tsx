@@ -27,7 +27,9 @@ import ProfileMenu from "../shared/ProfileMenu";
 import SafeEmailViewer from "../shared/SafeEmailViewer";
 import ComposeEditor from "../shared/ComposeEditor";
 import { useAuth } from "../auth/AuthContext";
+import { getPrimarySubmissionAccountId } from "../jmap/normalizeSession";
 import { createMailbox, deleteMailbox, getMailboxes, moveMailbox, renameMailbox, type JmapMailbox } from "../jmap/mailbox";
+import { getDraftsMailboxId, getOrCreateIdentity, sendEmailSubmission, upsertDraftEmail } from "../jmap/compose";
 import {
   clearEmailListCacheForAccount,
   destroyEmail,
@@ -113,6 +115,7 @@ function toMessage(email: JmapEmailSummary): Message {
 }
 
 type ComposeDraft = {
+  from: string;
   to: string;
   subject: string;
   // HTML (rich-text) body
@@ -177,6 +180,20 @@ const getBimiInitial = (from: string) => {
   return (match?.[0] ?? "?").toUpperCase();
 };
 
+function decodeBasicUsername(authHeader: string): string | null {
+  const trimmed = authHeader.trim();
+  if (!trimmed.toLowerCase().startsWith("basic ")) return null;
+  const encoded = trimmed.slice(6).trim();
+  try {
+    const decoded = atob(encoded);
+    const idx = decoded.indexOf(":");
+    const user = (idx >= 0 ? decoded.slice(0, idx) : decoded).trim();
+    return user || null;
+  } catch {
+    return null;
+  }
+}
+
 export default function MailPage() {
   const navigate = useNavigate();
   const { activeAuth: auth, activeProfile, signOut } = useAuth();
@@ -202,9 +219,12 @@ export default function MailPage() {
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeMinimized, setComposeMinimized] = useState(false);
   const [composeCancelConfirmOpen, setComposeCancelConfirmOpen] = useState(false);
+  const [composeBusy, setComposeBusy] = useState(false);
+  const [composeError, setComposeError] = useState<string | null>(null);
+  const [composeDraftEmailId, setComposeDraftEmailId] = useState<string | null>(null);
   const [rowActionsMessageId, setRowActionsMessageId] = useState<string | null>(null);
   const [expandedToIds, setExpandedToIds] = useState<Set<string>>(() => new Set());
-  const [composeDraft, setComposeDraft] = useState<ComposeDraft>({ to: "", subject: "", body: "" });
+  const [composeDraft, setComposeDraft] = useState<ComposeDraft>({ from: "", to: "", subject: "", body: "" });
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledFor, setScheduledFor] = useState<string>("");
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
@@ -797,7 +817,17 @@ export default function MailPage() {
   }, [sendMenuOpen]);
 
   const beginCompose = (draft?: Partial<ComposeDraft>) => {
+    setComposeError(null);
+    setComposeBusy(false);
+    setComposeDraftEmailId(null);
+    const inferredFrom = (() => {
+      const username = auth?.authHeader ? decodeBasicUsername(auth.authHeader) : null;
+      if (username && username.includes("@")) return username;
+      const acctName = auth?.session.accounts?.[auth.accountId]?.name ?? "";
+      return typeof acctName === "string" && acctName.includes("@") ? acctName : "";
+    })();
     setComposeDraft({
+      from: draft?.from ?? inferredFrom,
       to: draft?.to ?? "",
       subject: draft?.subject ?? "",
       body: draft?.body ? plainTextToHtml(draft.body) : ""
@@ -830,10 +860,131 @@ export default function MailPage() {
     setSendMenuOpen(false);
     setComposeCancelConfirmOpen(false);
     setComposeMinimized(false);
-    setComposeDraft({ to: "", subject: "", body: "" });
+    setComposeBusy(false);
+    setComposeError(null);
+    setComposeDraftEmailId(null);
+    setComposeDraft({ from: "", to: "", subject: "", body: "" });
     setScheduleEnabled(false);
     setScheduledFor("");
     setAttachments([]);
+  };
+
+  const saveDraftToServer = async () => {
+    if (!auth) return;
+    if (composeBusy) return;
+    setComposeError(null);
+    setComposeBusy(true);
+    try {
+      const draftsId =
+        mailboxes.find((m) => (m.role ?? "").toLowerCase() === "drafts")?.id ??
+        (await getDraftsMailboxId({ apiUrl: auth.session.apiUrl, authHeader: auth.authHeader, accountId: auth.accountId }));
+
+      const res = await upsertDraftEmail({
+        session: auth.session,
+        authHeader: auth.authHeader,
+        accountId: auth.accountId,
+        draftsMailboxId: draftsId,
+        from: composeDraft.from,
+        to: composeDraft.to,
+        subject: composeDraft.subject,
+        htmlBody: composeDraft.body,
+        attachments,
+        emailId: composeDraftEmailId
+      });
+
+      setComposeDraftEmailId(res.emailId);
+      setComposeMinimized(true);
+      clearEmailListCacheForAccount({ apiUrl: auth.session.apiUrl, accountId: auth.accountId });
+      void loadMailboxes({ force: true });
+    } catch (err) {
+      setComposeError(err instanceof Error ? err.message : "Failed to save draft");
+    } finally {
+      setComposeBusy(false);
+    }
+  };
+
+  const sendComposeToServer = async () => {
+    if (!auth) return;
+    if (composeBusy) return;
+    setComposeError(null);
+
+    if (composeDraft.from.trim() === "") {
+      setComposeError("From address is required.");
+      return;
+    }
+    if (composeDraft.to.trim() === "") {
+      setComposeError("Recipient is required.");
+      return;
+    }
+    if (scheduleEnabled && scheduledFor.trim() === "") {
+      setComposeError("Please choose a schedule time.");
+      return;
+    }
+
+    setComposeBusy(true);
+    try {
+      const submissionAccountId = getPrimarySubmissionAccountId(auth.session);
+      if (!submissionAccountId) {
+        throw new Error('JMAP session has no "submission" account (urn:ietf:params:jmap:submission)');
+      }
+
+      const draftsId =
+        mailboxes.find((m) => (m.role ?? "").toLowerCase() === "drafts")?.id ??
+        (await getDraftsMailboxId({ apiUrl: auth.session.apiUrl, authHeader: auth.authHeader, accountId: auth.accountId }));
+
+      const identity = await getOrCreateIdentity({
+        apiUrl: auth.session.apiUrl,
+        authHeader: auth.authHeader,
+        accountId: submissionAccountId,
+        email: composeDraft.from,
+        name: activeProfile.name
+      });
+
+      const { emailId } = await upsertDraftEmail({
+        session: auth.session,
+        authHeader: auth.authHeader,
+        accountId: auth.accountId,
+        draftsMailboxId: draftsId,
+        from: composeDraft.from,
+        to: composeDraft.to,
+        subject: composeDraft.subject,
+        htmlBody: composeDraft.body,
+        attachments,
+        emailId: composeDraftEmailId
+      });
+
+      const sendAtDate = scheduleEnabled ? new Date(scheduledFor) : null;
+      if (scheduleEnabled && (!sendAtDate || Number.isNaN(sendAtDate.getTime()))) {
+        setComposeError("Invalid schedule time.");
+        return;
+      }
+      const sendAt = sendAtDate ? sendAtDate.toISOString() : null;
+      await sendEmailSubmission({
+        apiUrl: auth.session.apiUrl,
+        authHeader: auth.authHeader,
+        accountId: submissionAccountId,
+        identity,
+        emailId,
+        to: composeDraft.to,
+        sendAt
+      });
+
+      discardCompose();
+      clearEmailListCacheForAccount({ apiUrl: auth.session.apiUrl, accountId: auth.accountId });
+      void loadMessages({ force: true });
+      void loadMailboxes({ force: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to send email";
+      if (message.toLowerCase().includes("invalid e-mail address") || message.toLowerCase().includes("invalid email address")) {
+        setComposeError(
+          `${message} The “From” address must be a real mailbox/domain configured in Stalwart (create it in the admin UI).`
+        );
+      } else {
+        setComposeError(message);
+      }
+    } finally {
+      setComposeBusy(false);
+    }
   };
 
   const toggleExpanded = (messageId: string) => {
@@ -1966,6 +2117,22 @@ export default function MailPage() {
             </div>
 
             <div className={styles.modalBody}>
+              {composeError && (
+                <div className={styles.errorState} role="alert" style={{ marginBottom: 10 }}>
+                  {composeError}
+                </div>
+              )}
+              <label className={styles.field}>
+                From
+                <input
+                  className={styles.input}
+                  type="email"
+                  placeholder="sender@example.com"
+                  value={composeDraft.from}
+                  disabled={composeBusy}
+                  onChange={(e) => setComposeDraft((prev) => ({ ...prev, from: e.target.value }))}
+                />
+              </label>
               <label className={styles.field}>
                 To
                 <input
@@ -1973,6 +2140,7 @@ export default function MailPage() {
                   type="email"
                   placeholder="recipient@example.com"
                   value={composeDraft.to}
+                  disabled={composeBusy}
                   onChange={(e) => setComposeDraft((prev) => ({ ...prev, to: e.target.value }))}
                 />
               </label>
@@ -1983,6 +2151,7 @@ export default function MailPage() {
                   type="text"
                   placeholder="Subject"
                   value={composeDraft.subject}
+                  disabled={composeBusy}
                   onChange={(e) => setComposeDraft((prev) => ({ ...prev, subject: e.target.value }))}
                 />
               </label>
@@ -1995,6 +2164,7 @@ export default function MailPage() {
                     className={`${styles.input} ${styles.datetimeInput}`}
                     type="datetime-local"
                     value={scheduledFor}
+                    disabled={composeBusy}
                     onChange={(e) => setScheduledFor(e.target.value)}
                   />
                 </label>
@@ -2052,6 +2222,7 @@ export default function MailPage() {
                 <button
                   className={styles.secondaryButton}
                   type="button"
+                  disabled={composeBusy}
                   onClick={() => {
                     if (isComposeDirty) setComposeCancelConfirmOpen(true);
                     else discardCompose();
@@ -2064,6 +2235,7 @@ export default function MailPage() {
                   type="button"
                   title="Attach file"
                   aria-label="Attach file"
+                  disabled={composeBusy}
                   onClick={() => attachmentsInputRef.current?.click()}
                 >
                   <Paperclip className={styles.icon} aria-hidden="true" />
@@ -2075,11 +2247,10 @@ export default function MailPage() {
                   <button
                     className={styles.primaryButton}
                     type="button"
-                    onClick={() => {
-                      discardCompose();
-                    }}
+                    disabled={composeBusy}
+                    onClick={() => void sendComposeToServer()}
                   >
-                    {scheduleEnabled ? "Schedule send" : "Send"}
+                    {composeBusy ? "Sending…" : scheduleEnabled ? "Schedule send" : "Send"}
                   </button>
                   <button
                     className={styles.splitToggle}
@@ -2088,6 +2259,7 @@ export default function MailPage() {
                     aria-expanded={sendMenuOpen}
                     aria-label="More send options"
                     title="More send options"
+                    disabled={composeBusy}
                     onClick={() => setSendMenuOpen((v) => !v)}
                   >
                     <ChevronDown className={styles.icon} aria-hidden="true" />
@@ -2099,14 +2271,20 @@ export default function MailPage() {
                         className={styles.sendMenuItem}
                         type="button"
                         role="menuitem"
+                        disabled={composeBusy}
                         onClick={() => {
-                          setSendMenuOpen(false);
-                          minimizeCompose();
+                          const run = async () => {
+                            setSendMenuOpen(false);
+                            await saveDraftToServer();
+                            setComposeOpen(false);
+                            setComposeCancelConfirmOpen(false);
+                          };
+                          void run();
                         }}
                       >
                         <span className={styles.sendMenuItemRow}>
                           <Save className={styles.icon} aria-hidden="true" />
-                          Save as draft
+                          {composeBusy ? "Saving…" : "Save as draft"}
                         </span>
                       </button>
                       {scheduleEnabled && (
@@ -2114,6 +2292,7 @@ export default function MailPage() {
                           className={styles.sendMenuItem}
                           type="button"
                           role="menuitem"
+                          disabled={composeBusy}
                           onClick={() => {
                             setScheduleEnabled(false);
                             setScheduledFor("");
@@ -2131,6 +2310,7 @@ export default function MailPage() {
                           className={styles.sendMenuItem}
                           type="button"
                           role="menuitem"
+                          disabled={composeBusy}
                           onClick={() => {
                             if (!scheduledFor) setScheduledFor(toDatetimeLocalValue(roundToNextMinutes(new Date(), 15)));
                             setSendMenuOpen(false);
@@ -2148,6 +2328,7 @@ export default function MailPage() {
                           className={styles.sendMenuItem}
                           type="button"
                           role="menuitem"
+                          disabled={composeBusy}
                           onClick={() => {
                             setScheduleEnabled(true);
                             if (!scheduledFor) setScheduledFor(toDatetimeLocalValue(roundToNextMinutes(new Date(), 15)));
@@ -2204,9 +2385,14 @@ export default function MailPage() {
               <button
                 type="button"
                 className={styles.primaryButton}
+                disabled={composeBusy}
                 onClick={() => {
-                  setComposeCancelConfirmOpen(false);
-                  minimizeCompose();
+                  const run = async () => {
+                    setComposeCancelConfirmOpen(false);
+                    await saveDraftToServer();
+                    setComposeOpen(false);
+                  };
+                  void run();
                 }}
               >
                 Save draft

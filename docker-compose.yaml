@@ -5,6 +5,12 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8002:8002"
+    environment:
+      # Deployment defaults (user can override via localStorage later).
+      # Allowed VITE_DEFAULT_THEME: light | dark | system
+      # Allowed VITE_DEFAULT_SCHEME: duck | pure-email | paper | mono
+      VITE_DEFAULT_THEME: ${VITE_DEFAULT_THEME:-light}
+      VITE_DEFAULT_SCHEME: ${VITE_DEFAULT_SCHEME:-pure-email}
     command: ["sh", "-lc", "npm ci && npm run dev -- --host 0.0.0.0 --port 8002"]
     volumes:
       - .:/app

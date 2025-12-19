@@ -1,7 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Add CSS “theme schemes” layer (via `data-scheme`) + compose editor defaults driven by `--compose-*` variables; no layout/spacing changes.
+- Add `pure-email` scheme (teal + gray palette) and allow Docker Compose to define default theme/scheme via `VITE_DEFAULT_THEME` / `VITE_DEFAULT_SCHEME`.
 - Persist auth per profile (Personal/Work) in localStorage and rehydrate JMAP sessions on app startup so page reloads don’t log you out; support switching profiles without losing the other session.
+- Implement JMAP compose actions: save drafts via Email/set (Drafts mailbox) and send/schedule via EmailSubmission/set (with uploads for attachments).
 - Improve mobile compose UX: hide FAB while composing, remove redundant close control, add split-send menu (send now / schedule / draft), add attachments picker with chips, and tune datetime picker styling.
 - Add minimized compose draft behavior (tap outside to minimize), a mobile compose dock with "Draft: 1", and a cancel confirmation dialog (save draft / discard / continue).
 - Add compose WYSIWYG editor with font family/size controls and inline image support (paste, drop, insert).

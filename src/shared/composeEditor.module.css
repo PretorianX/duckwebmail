@@ -1,8 +1,8 @@
 .editorShell {
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--compose-border-color);
   border-radius: 12px;
   overflow: hidden;
-  background: var(--card-background);
+  background: var(--compose-bg);
 }
 
 .toolbar {
@@ -11,8 +11,8 @@
   align-items: center;
   gap: 8px;
   padding: 10px;
-  border-bottom: 1px solid var(--border-color);
-  background: rgba(255, 204, 0, 0.06);
+  border-bottom: 1px solid var(--compose-border-color);
+  background: var(--compose-toolbar-bg);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -38,9 +38,9 @@
 .pickerButton {
   height: 40px;
   border-radius: 10px;
-  border: 1px solid var(--border-color);
-  background: var(--card-background);
-  color: var(--text-color);
+  border: 1px solid var(--compose-border-color);
+  background: var(--compose-bg);
+  color: var(--compose-text-color);
   padding: 0 12px;
   font-size: 16px; /* keep >=16px to avoid iOS zoom and improve readability */
   font-weight: 900;
@@ -72,7 +72,7 @@
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
-  color: var(--light-text);
+  color: var(--compose-muted-color);
   margin-left: auto;
 }
 
@@ -80,9 +80,9 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--compose-border-color);
   background: transparent;
-  color: var(--text-color);
+  color: var(--compose-text-color);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -119,8 +119,11 @@
   min-height: 220px;
   max-height: min(52vh, 520px);
   overflow: auto;
-  font-size: 1rem;
-  line-height: 1.45;
+  background: var(--compose-bg);
+  color: var(--compose-text-color);
+  font-family: var(--compose-font-family);
+  font-size: var(--compose-font-size);
+  line-height: var(--compose-line-height);
   cursor: text;
   -webkit-user-select: none;
   user-select: none;
@@ -133,10 +136,13 @@
 
 :global(.ProseMirror) {
   outline: none;
-  font-size: 1rem;
+  font-family: var(--compose-font-family);
+  font-size: var(--compose-font-size);
+  line-height: var(--compose-line-height);
   min-height: 220px;
   width: 100%;
-  caret-color: var(--text-color);
+  color: var(--compose-text-color);
+  caret-color: var(--compose-caret-color);
   -webkit-tap-highlight-color: transparent;
   -webkit-user-select: text;
   user-select: text;
@@ -163,13 +169,13 @@
 :global(.ProseMirror blockquote) {
   margin: 10px 0;
   padding: 8px 10px;
-  border-left: 3px solid rgba(255, 204, 0, 0.9);
-  background: rgba(255, 204, 0, 0.06);
+  border-left: 3px solid var(--compose-quote-border);
+  background: var(--compose-quote-bg);
   border-radius: 10px;
 }
 
 :global(.ProseMirror a) {
-  color: var(--primary-color);
+  color: var(--compose-link-color);
   text-decoration: underline;
 }
 
@@ -180,7 +186,7 @@
 }
 
 :global(.ProseMirror p.is-editor-empty:first-child::before) {
-  color: var(--light-text);
+  color: var(--compose-muted-color);
   content: attr(data-placeholder);
   float: left;
   height: 0;
