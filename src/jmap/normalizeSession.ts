@@ -8,6 +8,7 @@ export interface JmapSession {
   downloadUrl: string;
   uploadUrl: string;
   eventSourceUrl?: string;
+  webSocketUrl?: string;
   accounts: Record<string, JmapAccount>;
   primaryAccounts?: Record<string, string>;
   capabilities: Record<string, unknown>;
@@ -32,13 +33,38 @@ function toPathOnly(url: string): string {
   }
 }
 
+/**
+ * Extract WebSocket URL from JMAP session.
+ * Stalwart puts it in capabilities["urn:ietf:params:jmap:websocket"].url
+ */
+function extractWebSocketUrl(session: JmapSession): string | undefined {
+  // First check top-level webSocketUrl (some servers might use this)
+  if (session.webSocketUrl) {
+    return session.webSocketUrl;
+  }
+
+  // Check capabilities for urn:ietf:params:jmap:websocket
+  const wsCapability = session.capabilities?.["urn:ietf:params:jmap:websocket"];
+  if (wsCapability && typeof wsCapability === "object") {
+    const url = (wsCapability as Record<string, unknown>).url;
+    if (typeof url === "string") {
+      return url;
+    }
+  }
+
+  return undefined;
+}
+
 export function normalizeSession(session: JmapSession): JmapSession {
+  const webSocketUrl = extractWebSocketUrl(session);
+
   return {
     ...session,
     apiUrl: toPathOnly(session.apiUrl),
     downloadUrl: toPathOnly(session.downloadUrl),
     uploadUrl: toPathOnly(session.uploadUrl),
-    eventSourceUrl: session.eventSourceUrl ? toPathOnly(session.eventSourceUrl) : undefined
+    eventSourceUrl: session.eventSourceUrl ? toPathOnly(session.eventSourceUrl) : undefined,
+    webSocketUrl: webSocketUrl ? toPathOnly(webSocketUrl) : undefined
   };
 }
 

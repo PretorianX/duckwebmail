@@ -2,10 +2,10 @@
 
 ## Unreleased
 - Improve mobile compose UX: hide FAB while composing, remove redundant close control, add split-send menu (send now / schedule / draft), add attachments picker with chips, and tune datetime picker styling.
-- Add minimized compose draft behavior (tap outside to minimize), a mobile compose dock with “Draft: 1”, and a cancel confirmation dialog (save draft / discard / continue).
+- Add minimized compose draft behavior (tap outside to minimize), a mobile compose dock with "Draft: 1", and a cancel confirmation dialog (save draft / discard / continue).
 - Add compose WYSIWYG editor with font family/size controls and inline image support (paste, drop, insert).
-- Simplify compose toolbar: keep font/size/undo visible and move other actions into a single “More” sheet.
-- Rename “Mailboxes” to “Folders” and add a nested folder tree with expand/collapse plus quick filtering for fast browsing in large folder hierarchies.
+- Simplify compose toolbar: keep font/size/undo visible and move other actions into a single "More" sheet.
+- Rename "Mailboxes" to "Folders" and add a nested folder tree with expand/collapse plus quick filtering for fast browsing in large folder hierarchies.
 - Add local Stalwart mail server via Docker Compose (SMTP/Submission/IMAP/JMAP + admin/API) with self-signed TLS for development.
 - Sync active profile display across tabs/windows (react to `localStorage` changes).
 - Integrate Stalwart JMAP for login (Basic Auth, in-memory session) with Vite dev proxy; add auth context and JMAP client utilities.
@@ -13,4 +13,6 @@
 - Load real folder list from JMAP (`Mailbox/get`) and render it in the folder tree + picker with loading/error states.
 - Add folder operations (create/rename/delete) backed by JMAP `Mailbox/set`, including nested folder creation via parent selection.
 - Load real email list per folder via JMAP (`Email/query` + `Email/get`) with inline message body fetch on expand.
-- Fix mobile folder picker UX: restore scrolling and make folder actions (“…”) reliably tappable.
+- Fix mobile folder picker UX: restore scrolling and make folder actions ("…") reliably tappable.
+- Add JMAP over WebSocket push (RFC 8887) for real-time updates: auto-refresh folder counts and email list when new mail arrives, with debounced refresh and dev metrics logging.
+- Fix WebSocket URL extraction from Stalwart session (URL is in `capabilities["urn:ietf:params:jmap:websocket"].url`, not top-level).

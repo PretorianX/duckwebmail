@@ -36,6 +36,7 @@ import {
   listEmailSummariesInMailbox,
   type JmapEmailSummary
 } from "../jmap/email";
+import { JmapPushClient, stateChangeAffects, type StateChange } from "../jmap/webSocketPush";
 import styles from "./mail.module.css";
 
 type Folder = { id: string; name: string; unread: number; parentId?: string | null };
@@ -244,7 +245,6 @@ export default function MailPage() {
     const media = window.matchMedia("(pointer: fine) and (hover: hover)");
     const apply = () => setCanDragFolders(media.matches);
     apply();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onChange = () => apply();
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);
@@ -326,15 +326,19 @@ export default function MailPage() {
   }, [folders]);
 
   const selectedMailbox = useMemo(() => mailboxById.get(folderId) ?? null, [folderId, mailboxById]);
-  const selectedIsSystemFolder = useMemo(() => {
+  const _selectedIsSystemFolder = useMemo(() => {
     const role = (selectedMailbox?.role ?? "").trim();
     return role.length > 0;
   }, [selectedMailbox]);
 
-  const selectedHasChildren = useMemo(() => {
+  const _selectedHasChildren = useMemo(() => {
     const children = folderIndex.childrenByParent.get(folderId) ?? [];
     return children.length > 0;
   }, [folderId, folderIndex.childrenByParent]);
+
+  // Suppress unused variable warnings (these may be used in the future)
+  void _selectedIsSystemFolder;
+  void _selectedHasChildren;
 
   const folderOptions = useMemo(() => {
     type Opt = { id: string; label: string; depth: number };
@@ -648,6 +652,146 @@ export default function MailPage() {
     void loadMessages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth?.accountId, auth?.authHeader, auth?.session.apiUrl, folderId]);
+
+  // --- JMAP WebSocket Push ---
+  // Keep a ref to the current folderId so the callback always sees the latest value.
+  const folderIdRef = useRef(folderId);
+  useEffect(() => {
+    folderIdRef.current = folderId;
+  }, [folderId]);
+
+  // Debounced refresh triggered by push notifications
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pushClientRef = useRef<JmapPushClient | null>(null);
+
+  useEffect(() => {
+    if (!auth) return;
+    const wsUrl = auth.session.webSocketUrl;
+    if (!wsUrl) {
+      console.log("[JmapPush] No webSocketUrl in session, push disabled");
+      return;
+    }
+
+    const debounceMs = 800;
+
+    const handleStateChange = (change: StateChange) => {
+      const affectsMailbox = stateChangeAffects(change, "Mailbox");
+      const affectsEmail = stateChangeAffects(change, "Email");
+
+      if (!affectsMailbox && !affectsEmail) return;
+
+      console.log("[JmapPush] StateChange received:", {
+        affectsMailbox,
+        affectsEmail,
+        changed: change.changed
+      });
+
+      // Debounce: clear any pending refresh and schedule a new one
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+
+      refreshTimeoutRef.current = setTimeout(() => {
+        refreshTimeoutRef.current = null;
+        const startTime = performance.now();
+
+        const refreshPromises: Promise<void>[] = [];
+
+        if (affectsMailbox) {
+          console.log("[JmapPush] Refreshing mailboxes...");
+          refreshPromises.push(
+            (async () => {
+              await loadMailboxes({ force: true });
+              console.log("[JmapPush] Mailboxes refreshed in", Math.round(performance.now() - startTime), "ms");
+            })()
+          );
+        }
+
+        if (affectsEmail && folderIdRef.current) {
+          console.log("[JmapPush] Refreshing messages...");
+          refreshPromises.push(
+            (async () => {
+              await loadMessages({ force: true });
+              console.log("[JmapPush] Messages refreshed in", Math.round(performance.now() - startTime), "ms");
+            })()
+          );
+        }
+
+        if (pushClientRef.current) {
+          pushClientRef.current.recordRefresh();
+        }
+
+        void Promise.all(refreshPromises);
+      }, debounceMs);
+    };
+
+    const client = new JmapPushClient({
+      webSocketUrl: wsUrl,
+      authHeader: auth.authHeader,
+      dataTypes: ["Email", "Mailbox"],
+      onStateChange: handleStateChange,
+      onOpen: () => {
+        console.log("[JmapPush] Connected to JMAP WebSocket");
+        console.log("[JmapPush] Tip: Access metrics via window.__jmapPushMetrics()");
+      },
+      onClose: (event) => {
+        // Log metrics summary on close
+        const m = client.metrics;
+        const sessionDurationMs = m.connectionOpenedAt ? Date.now() - m.connectionOpenedAt : 0;
+        console.log("[JmapPush] WebSocket closed:", event.code, event.reason);
+        console.log("[JmapPush] Session metrics:", {
+          sessionDurationMs,
+          sessionDurationSec: Math.round(sessionDurationMs / 1000),
+          stateChangesReceived: m.stateChangesReceived,
+          refreshesTriggered: m.refreshesTriggered,
+          lastChangeAt: m.lastChangeAt ? new Date(m.lastChangeAt).toISOString() : null
+        });
+      },
+      onError: () => {
+        console.log("[JmapPush] WebSocket error");
+      },
+      debug: true
+    });
+
+    pushClientRef.current = client;
+    client.connect();
+
+    // Expose metrics to window for debugging
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__jmapPushMetrics = () => {
+      const m = client.metrics;
+      const sessionDurationMs = m.connectionOpenedAt ? Date.now() - m.connectionOpenedAt : 0;
+      return {
+        connected: client.isConnected(),
+        sessionDurationMs,
+        sessionDurationSec: Math.round(sessionDurationMs / 1000),
+        stateChangesReceived: m.stateChangesReceived,
+        refreshesTriggered: m.refreshesTriggered,
+        lastChangeAt: m.lastChangeAt ? new Date(m.lastChangeAt).toISOString() : null
+      };
+    };
+
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = null;
+      }
+      // Log final metrics before closing
+      const m = client.metrics;
+      const sessionDurationMs = m.connectionOpenedAt ? Date.now() - m.connectionOpenedAt : 0;
+      console.log("[JmapPush] Closing - Final metrics:", {
+        sessionDurationMs,
+        sessionDurationSec: Math.round(sessionDurationMs / 1000),
+        stateChangesReceived: m.stateChangesReceived,
+        refreshesTriggered: m.refreshesTriggered
+      });
+      client.close();
+      pushClientRef.current = null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window as any).__jmapPushMetrics;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth?.accountId, auth?.authHeader, auth?.session.webSocketUrl]);
 
   useEffect(() => {
     // Always close the picker after selecting a folder.

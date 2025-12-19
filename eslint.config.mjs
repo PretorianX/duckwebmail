@@ -32,7 +32,11 @@ export default [
         btoa: "readonly",
         URL: "readonly",
         Blob: "readonly",
-        console: "readonly"
+        console: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        performance: "readonly",
+        WebSocket: "readonly"
       }
     },
     settings: {
