@@ -1712,10 +1712,22 @@ export default function MailPage() {
             {quotaLoading ? (
               <span className={styles.footerQuotaLoading}>Loading…</span>
             ) : quotaError ? (
-              <span className={styles.footerQuotaMuted}>Quota unavailable</span>
+              <span className={styles.footerQuotaMuted} title={quotaError}>
+                Quota unavailable
+              </span>
             ) : (() => {
+              if (quotas.length === 0) {
+                return <span className={styles.footerQuotaMuted}>Quota not configured</span>;
+              }
               const storageQuota = quotas.find((q) => q.resourceType === "octets");
-              if (!storageQuota) return <span className={styles.footerQuotaMuted}>Quota unavailable</span>;
+              if (!storageQuota) {
+                const types = Array.from(new Set(quotas.map((q) => q.resourceType))).join(", ");
+                return (
+                  <span className={styles.footerQuotaMuted} title={`Available quota resourceTypes: ${types || "none"}`}>
+                    Storage quota unavailable
+                  </span>
+                );
+              }
               const limitText = storageQuota.hardLimit ? formatQuotaBytes(storageQuota.hardLimit) : "unlimited";
               return (
                 <span className={styles.footerQuotaItem}>

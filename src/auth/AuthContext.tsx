@@ -173,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       if (err instanceof Error && err.message === "Unauthorized") {
         throw new Error(
-          'Invalid username/email or password. For local Stalwart dev, try "admin" / "admin" or "test@domain.ote" / "111".'
+          'Invalid username/email or password. For local Stalwart dev, use a non-admin mailbox user (see `stalwart/etc/config.toml` / `docker-compose.yaml`).'
         );
       }
       throw err;
