@@ -1142,7 +1142,10 @@ export default function MailPage() {
                               className={`${styles.iconButton} ${styles.folderMoreButton}`}
                               aria-label={`Folder actions ${f.name}`}
                               title="Folder actions"
-                              onClick={() => setFolderActionsFolderId(f.id)}
+                              onClick={() => {
+                                setFolderPickerOpen(false);
+                                setFolderActionsFolderId(f.id);
+                              }}
                               onFocus={() => setDropTargetFolderId(null)}
                             >
                               <MoreHorizontal className={styles.icon} aria-hidden="true" />
@@ -1822,7 +1825,10 @@ export default function MailPage() {
                                   className={`${styles.iconButton} ${styles.folderMoreButton}`}
                                   aria-label={`Folder actions ${f.name}`}
                                   title="Folder actions"
-                                  onClick={() => setFolderActionsFolderId(f.id)}
+                                  onClick={() => {
+                                    setFolderPickerOpen(false);
+                                    setFolderActionsFolderId(f.id);
+                                  }}
                                 >
                                   <MoreHorizontal className={styles.icon} aria-hidden="true" />
                                 </button>
