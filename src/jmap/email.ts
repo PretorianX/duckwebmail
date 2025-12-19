@@ -247,3 +247,45 @@ export function isUnread(keywords: Record<string, boolean> | undefined): boolean
 export function isStarred(keywords: Record<string, boolean> | undefined): boolean {
   return !!(keywords && keywords["$flagged"] === true);
 }
+
+/**
+ * Mark an email as read by setting the $seen keyword.
+ * Returns true if the update succeeded.
+ */
+export async function markEmailAsRead(params: {
+  apiUrl: string;
+  authHeader: string;
+  accountId: string;
+  emailId: string;
+}): Promise<boolean> {
+  const callId = generateCallId("seen");
+  const res = await jmapRequest(params.apiUrl, params.authHeader, [JMAP_CORE, JMAP_MAIL], [
+    [
+      "Email/set",
+      {
+        accountId: params.accountId,
+        update: {
+          [params.emailId]: {
+            "keywords/$seen": true
+          }
+        }
+      },
+      callId
+    ]
+  ]);
+
+  const errText = getErrorText(res.methodResponses);
+  if (errText) {
+    console.error("[JMAP] markEmailAsRead failed:", errText);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Clear the email list cache (e.g. when a StateChange is received).
+ */
+export function clearEmailListCache(): void {
+  emailListCache.clear();
+}

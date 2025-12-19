@@ -16,3 +16,5 @@
 - Fix mobile folder picker UX: restore scrolling and make folder actions ("…") reliably tappable.
 - Add JMAP over WebSocket push (RFC 8887) for real-time updates: auto-refresh folder counts and email list when new mail arrives, with debounced refresh and dev metrics logging.
 - Fix WebSocket URL extraction from Stalwart session (URL is in `capabilities["urn:ietf:params:jmap:websocket"].url`, not top-level).
+- Mark emails as read when expanded (`Email/set` with `$seen` keyword) and update folder unread counts.
+- Fix stale email list on folder switch by forcing refresh and clearing cache on `StateChange`.

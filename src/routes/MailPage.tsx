@@ -29,11 +29,13 @@ import ComposeEditor from "../shared/ComposeEditor";
 import { useAuth } from "../auth/AuthContext";
 import { createMailbox, deleteMailbox, getMailboxes, moveMailbox, renameMailbox, type JmapMailbox } from "../jmap/mailbox";
 import {
+  clearEmailListCache,
   formatAddressList,
   getEmailBody,
   isStarred,
   isUnread,
   listEmailSummariesInMailbox,
+  markEmailAsRead,
   type JmapEmailSummary
 } from "../jmap/email";
 import { JmapPushClient, stateChangeAffects, type StateChange } from "../jmap/webSocketPush";
@@ -649,7 +651,8 @@ export default function MailPage() {
       setBodyLoadingIds(new Set());
       return;
     }
-    void loadMessages();
+    // Always force refresh when folder changes to avoid stale cached data
+    void loadMessages({ force: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth?.accountId, auth?.authHeader, auth?.session.apiUrl, folderId]);
 
@@ -685,6 +688,11 @@ export default function MailPage() {
         affectsEmail,
         changed: change.changed
       });
+
+      // Clear cached email lists immediately so folder switches get fresh data
+      if (affectsEmail) {
+        clearEmailListCache();
+      }
 
       // Debounce: clear any pending refresh and schedule a new one
       if (refreshTimeoutRef.current) {
@@ -887,6 +895,29 @@ export default function MailPage() {
       }
     };
 
+    const markAsReadIfNeeded = async () => {
+      if (!auth) return;
+      // Find the message and check if it's unread
+      const msg = messages.find((m) => m.id === messageId);
+      if (!msg || !msg.unread) return;
+
+      // Optimistically update local state
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, unread: false } : m)));
+
+      // Send JMAP request to mark as read
+      const success = await markEmailAsRead({
+        apiUrl: auth.session.apiUrl,
+        authHeader: auth.authHeader,
+        accountId: auth.accountId,
+        emailId: messageId
+      });
+
+      if (success) {
+        // Refresh mailboxes to update unread counts
+        void loadMailboxes({ force: true });
+      }
+    };
+
     setExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(messageId)) {
@@ -899,6 +930,7 @@ export default function MailPage() {
       } else {
         next.add(messageId);
         void ensureBodyLoaded();
+        void markAsReadIfNeeded();
       }
       return next;
     });
