@@ -317,7 +317,18 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, placeholder = "
         }}
       />
 
-      <div className={styles.editor} aria-label="Message body">
+      <div
+        className={styles.editor}
+        aria-label="Message body"
+        onPointerDown={(e) => {
+          // Only intercept taps on the editor *container* (padding / empty area).
+          // If we always force-focus, Samsung Internet can lose caret placement
+          // and show an ugly focus ring instead of the cursor.
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
+          editor?.chain().focus("end").run();
+        }}
+      >
         <EditorContent editor={editor} />
       </div>
 
