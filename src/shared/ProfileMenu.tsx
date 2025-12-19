@@ -146,12 +146,6 @@ const RightIcon = styled.span`
   }
 `;
 
-const Subtle = styled.div`
-  padding: 0 12px 10px;
-  color: var(--light-text);
-  font-size: 0.85rem;
-`;
-
 export default function ProfileMenu() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -331,8 +325,6 @@ export default function ProfileMenu() {
               );
             })}
           </Section>
-
-          <Subtle>Mobile theme follows your device settings.</Subtle>
         </Popover>
       )}
     </Wrapper>

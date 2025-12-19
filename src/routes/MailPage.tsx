@@ -46,6 +46,8 @@ import {
 import { JmapPushClient, stateChangeAffectsAccount, type StateChange } from "../jmap/webSocketPush";
 import styles from "./mail.module.css";
 
+const branding = (import.meta.env.VITE_LOGIN_BRANDING as string | undefined)?.trim() || "Duckmail";
+
 type Folder = { id: string; name: string; unread: number; parentId?: string | null };
 type Attachment = {
   id: string;
@@ -266,6 +268,7 @@ export default function MailPage() {
   const [messagesTotal, setMessagesTotal] = useState<number | null>(null);
   const [bodyLoadingIds, setBodyLoadingIds] = useState<Set<string>>(() => new Set());
   const [bodyErrors, setBodyErrors] = useState<Record<string, string>>({});
+  const [emailCopied, setEmailCopied] = useState(false);
   const activeProfileName = activeProfile.name;
   const [canDragFolders, setCanDragFolders] = useState(false);
 
@@ -1276,7 +1279,7 @@ export default function MailPage() {
       <header className={styles.header}>
         <div className={styles.headerLogo}>
           <span className={styles.headerDuck} aria-hidden="true">🦆</span>
-          <span className={styles.headerBrand}>Duckmail</span>
+          <span className={styles.headerBrand}>{branding}</span>
         </div>
         <div className={styles.headerSearch}>
           <label className={styles.searchLabel}>
@@ -1285,6 +1288,24 @@ export default function MailPage() {
           </label>
         </div>
         <div className={styles.headerActions}>
+          {auth && (() => {
+            const signedInEmail = decodeBasicUsername(auth.authHeader);
+            if (!signedInEmail) return null;
+            return (
+              <button
+                type="button"
+                className={styles.headerEmail}
+                title="Click to copy email"
+                onClick={() => {
+                  void navigator.clipboard.writeText(signedInEmail);
+                  setEmailCopied(true);
+                  setTimeout(() => setEmailCopied(false), 1500);
+                }}
+              >
+                {emailCopied ? "Copied to clipboard" : signedInEmail}
+              </button>
+            );
+          })()}
           <ProfileMenu />
         </div>
       </header>
@@ -1690,9 +1711,11 @@ export default function MailPage() {
           <div className={styles.footerQuota}>
             {quotaLoading ? (
               <span className={styles.footerQuotaLoading}>Loading…</span>
-            ) : quotaError ? null : (() => {
+            ) : quotaError ? (
+              <span className={styles.footerQuotaMuted}>Quota unavailable</span>
+            ) : (() => {
               const storageQuota = quotas.find((q) => q.resourceType === "octets");
-              if (!storageQuota) return null;
+              if (!storageQuota) return <span className={styles.footerQuotaMuted}>Quota unavailable</span>;
               const limitText = storageQuota.hardLimit ? formatQuotaBytes(storageQuota.hardLimit) : "unlimited";
               return (
                 <span className={styles.footerQuotaItem}>
@@ -1702,7 +1725,7 @@ export default function MailPage() {
             })()}
           </div>
           <div className={styles.footerCopyright}>
-            © {new Date().getFullYear()} Duckwebmail 🦆
+            © {new Date().getFullYear()} mail-duck.com
           </div>
         </footer>
       </section>
