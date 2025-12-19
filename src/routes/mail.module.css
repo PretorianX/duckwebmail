@@ -76,11 +76,15 @@
 
 .folderFilterRow {
   padding: 0 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .folderFilterLabel {
   width: 100%;
   display: block;
+  flex: 1 1 auto;
 }
 
 .folderFilter {
@@ -96,6 +100,73 @@
 .folderFilter:focus {
   border-color: rgba(255, 204, 0, 0.65);
   box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.18);
+}
+
+.folderRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.folderMoreButton {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.folderItem:hover .folderMoreButton,
+.folderItem:focus .folderMoreButton,
+.folderItem:focus-visible .folderMoreButton,
+.folderItemActive .folderMoreButton,
+.sheetFolderItem:hover .folderMoreButton,
+.sheetFolderItem:focus .folderMoreButton,
+.sheetFolderItem:focus-visible .folderMoreButton,
+.sheetFolderItemActive .folderMoreButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.folderItemDropTarget {
+  border-color: rgba(255, 204, 0, 0.65) !important;
+  background: rgba(255, 204, 0, 0.1) !important;
+}
+
+.folderOpModal {
+  width: 100%;
+  max-width: 440px;
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.folderOpForm {
+  display: grid;
+  gap: 10px;
+}
+
+.folderOpField {
+  display: grid;
+  gap: 6px;
+}
+
+.folderOpLabel {
+  font-size: 0.9rem;
+  font-weight: 850;
+  color: var(--light-text);
+}
+
+.folderOpError {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--error-background, #fef2f2);
+  color: var(--error-color, #dc2626);
+  border: 1px solid var(--error-border, #fecaca);
+  font-size: 0.9rem;
 }
 
 .folderTree {
@@ -128,6 +199,7 @@
   color: inherit;
   padding: 9px 10px;
   border-radius: 12px;
+  cursor: pointer;
 }
 
 .folderItem:hover {
@@ -465,6 +537,7 @@
   color: inherit;
   padding: 11px 12px;
   border-radius: 14px;
+  cursor: pointer;
 }
 
 .sheetFolderItem:hover {

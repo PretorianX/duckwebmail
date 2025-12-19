@@ -11,3 +11,5 @@
 - Integrate Stalwart JMAP for login (Basic Auth, in-memory session) with Vite dev proxy; add auth context and JMAP client utilities.
 - Fix JMAP login by requesting `/jmap/session` directly (avoid `/.well-known/jmap` redirect edge cases) and show clearer local-dev credential hints.
 - Load real folder list from JMAP (`Mailbox/get`) and render it in the folder tree + picker with loading/error states.
+- Add folder operations (create/rename/delete) backed by JMAP `Mailbox/set`, including nested folder creation via parent selection.
+- Load real email list per folder via JMAP (`Email/query` + `Email/get`) with inline message body fetch on expand.

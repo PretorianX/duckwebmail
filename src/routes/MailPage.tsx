@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   Paperclip,
   Pencil,
+  Plus,
   Reply,
   Save,
   Star,
@@ -26,7 +27,15 @@ import ProfileMenu from "../shared/ProfileMenu";
 import SafeEmailViewer from "../shared/SafeEmailViewer";
 import ComposeEditor from "../shared/ComposeEditor";
 import { useAuth } from "../auth/AuthContext";
-import { getMailboxes, type JmapMailbox } from "../jmap/mailbox";
+import { createMailbox, deleteMailbox, getMailboxes, moveMailbox, renameMailbox, type JmapMailbox } from "../jmap/mailbox";
+import {
+  formatAddressList,
+  getEmailBody,
+  isStarred,
+  isUnread,
+  listEmailSummariesInMailbox,
+  type JmapEmailSummary
+} from "../jmap/email";
 import styles from "./mail.module.css";
 
 type Folder = { id: string; name: string; unread: number; parentId?: string | null };
@@ -46,6 +55,7 @@ type Message = {
   receivedAt: string;
   unread: boolean;
   starred: boolean;
+  hasAttachments: boolean;
   attachments: Attachment[];
   rawSource: string;
   html?: string;
@@ -102,68 +112,27 @@ function pickDefaultFolderId(mailboxes: JmapMailbox[]): string | null {
   return mailboxes[0]?.id ?? null;
 }
 
-const demoMessages: Message[] = [
-  {
-    id: "m1",
-    from: "Alice <alice@example.com>",
-    to: "You <you@duckwebmail.local>",
-    subject: "Welcome",
-    preview: "Welcome to RayMap Webmail — this is a demo message.",
-    receivedAt: new Date().toISOString(),
-    unread: true,
-    starred: false,
-    attachments: [
-      {
-        id: "a1",
-        name: "welcome.txt",
-        sizeBytes: 1536,
-        contentType: "text/plain",
-        content: "Welcome to Duckwebmail!\n\nThis is a demo attachment.\n"
-      }
-    ],
-    rawSource: [
-      "From: Alice <alice@example.com>",
-      "To: You <you@duckwebmail.local>",
-      "Subject: Welcome",
-      "MIME-Version: 1.0",
-      "Content-Type: text/html; charset=utf-8",
-      "",
-      "<p><strong>Welcome</strong> to RayMap Webmail.</p><p>This expands inline as a full-width row.</p>"
-    ].join("\n"),
-    html: "<p><strong>Welcome</strong> to RayMap Webmail.</p><p>This expands inline as a full-width row.</p>"
-  },
-  {
-    id: "m2",
-    from: "Billing <billing@example.com>",
-    to: "You <you@duckwebmail.local>",
-    subject: "Invoice #1234",
-    preview: "Your invoice is ready. Please review.",
-    receivedAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-    unread: false,
-    starred: false,
-    attachments: [
-      {
-        id: "a2",
-        name: "invoice-1234.pdf",
-        sizeBytes: 293_481,
-        contentType: "application/pdf",
-        content: "%PDF-1.4\n% Demo PDF content placeholder\n"
-      }
-    ],
-    rawSource: [
-      "From: Billing <billing@example.com>",
-      "To: You <you@duckwebmail.local>",
-      "Subject: Invoice #1234",
-      "MIME-Version: 1.0",
-      "Content-Type: text/plain; charset=utf-8",
-      "",
-      "Invoice #1234",
-      "",
-      "This is a plain text email demo."
-    ].join("\n"),
-    text: "Invoice #1234\n\nThis is a plain text email demo."
-  }
-];
+function toMessage(email: JmapEmailSummary): Message {
+  const from = formatAddressList(email.from);
+  const to = formatAddressList(email.to);
+  const subject = (email.subject ?? "").trim();
+  const preview = (email.preview ?? "").trim();
+  const receivedAt = email.receivedAt ?? new Date(0).toISOString();
+
+  return {
+    id: email.id,
+    from: from || "(no sender)",
+    to,
+    subject: subject || "(no subject)",
+    preview,
+    receivedAt,
+    unread: isUnread(email.keywords),
+    starred: isStarred(email.keywords),
+    hasAttachments: !!email.hasAttachment,
+    attachments: [],
+    rawSource: ""
+  };
+}
 
 type ComposeDraft = {
   to: string;
@@ -240,6 +209,16 @@ export default function MailPage() {
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
   const [folderQuery, setFolderQuery] = useState("");
   const [openFolderIds, setOpenFolderIds] = useState<Set<string>>(() => new Set());
+  const [folderActionsFolderId, setFolderActionsFolderId] = useState<string | null>(null);
+  const [folderUiError, setFolderUiError] = useState<string | null>(null);
+  const [draggingFolderId, setDraggingFolderId] = useState<string | null>(null);
+  const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null);
+  const [folderOpMode, setFolderOpMode] = useState<"create" | "rename" | "delete" | null>(null);
+  const [folderOpTargetId, setFolderOpTargetId] = useState<string | null>(null);
+  const [folderOpBusy, setFolderOpBusy] = useState(false);
+  const [folderOpError, setFolderOpError] = useState<string | null>(null);
+  const [folderOpName, setFolderOpName] = useState("");
+  const [folderOpParentId, setFolderOpParentId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [expandedAttachmentIds, setExpandedAttachmentIds] = useState<Set<string>>(() => new Set());
   const [composeOpen, setComposeOpen] = useState(false);
@@ -252,12 +231,18 @@ export default function MailPage() {
   const [scheduledFor, setScheduledFor] = useState<string>("");
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
-  const [messages, setMessages] = useState<Message[]>(() => demoMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
+  const [messagesTotal, setMessagesTotal] = useState<number | null>(null);
+  const [bodyLoadingIds, setBodyLoadingIds] = useState<Set<string>>(() => new Set());
+  const [bodyErrors, setBodyErrors] = useState<Record<string, string>>({});
   const activeProfileName = useMemo(() => readActiveProfileName(), []);
 
   const [mailboxesLoading, setMailboxesLoading] = useState(false);
   const [mailboxesError, setMailboxesError] = useState<string | null>(null);
   const [mailboxes, setMailboxes] = useState<JmapMailbox[]>([]);
+  const mailboxById = useMemo(() => new Map(mailboxes.map((m) => [m.id, m])), [mailboxes]);
 
   const loadMailboxes = async (opts?: { force?: boolean }) => {
     if (!auth) return;
@@ -311,18 +296,48 @@ export default function MailPage() {
   const folders: Folder[] = useMemo(() => mailboxes.map(toFolder), [mailboxes]);
 
   const folderIndex = useMemo(() => {
+    // Build a stable tree:
+    // - Preserve the server-provided mailbox ordering (we sort mailboxes before mapping to folders).
+    // - Treat orphaned folders (parentId missing from the list) as root folders.
     const byId = new Map<string, Folder>();
+    for (const f of folders) byId.set(f.id, f);
+
     const childrenByParent = new Map<string | null, Folder[]>();
     for (const f of folders) {
-      byId.set(f.id, f);
-      const parentKey = f.parentId ?? null;
+      const parentKey =
+        f.parentId && typeof f.parentId === "string" && byId.has(f.parentId) ? (f.parentId as string) : null;
       const list = childrenByParent.get(parentKey) ?? [];
       list.push(f);
       childrenByParent.set(parentKey, list);
     }
-    for (const [, list] of childrenByParent) list.sort((a, b) => a.name.localeCompare(b.name));
+
     return { byId, childrenByParent };
   }, [folders]);
+
+  const selectedMailbox = useMemo(() => mailboxById.get(folderId) ?? null, [folderId, mailboxById]);
+  const selectedIsSystemFolder = useMemo(() => {
+    const role = (selectedMailbox?.role ?? "").trim();
+    return role.length > 0;
+  }, [selectedMailbox]);
+
+  const selectedHasChildren = useMemo(() => {
+    const children = folderIndex.childrenByParent.get(folderId) ?? [];
+    return children.length > 0;
+  }, [folderId, folderIndex.childrenByParent]);
+
+  const folderOptions = useMemo(() => {
+    type Opt = { id: string; label: string; depth: number };
+    const out: Opt[] = [];
+    const walk = (parentId: string | null, depth: number) => {
+      const children = folderIndex.childrenByParent.get(parentId) ?? [];
+      for (const f of children) {
+        out.push({ id: f.id, label: f.name, depth });
+        walk(f.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    return out;
+  }, [folderIndex.childrenByParent]);
 
   const normalizedFolderQuery = useMemo(() => folderQuery.trim().toLowerCase(), [folderQuery]);
   const { visibleFolderIds, autoExpandFolderIds } = useMemo(() => {
@@ -368,6 +383,198 @@ export default function MailPage() {
     const first = folders[0];
     return first ?? { id: "", name: "Folders", unread: 0, parentId: null };
   }, [folderId, folderIndex.byId, folders]);
+
+  const folderActionsFolder = useMemo(
+    () => (folderActionsFolderId ? folderIndex.byId.get(folderActionsFolderId) ?? null : null),
+    [folderActionsFolderId, folderIndex.byId]
+  );
+  const folderActionsMailbox = useMemo(
+    () => (folderActionsFolderId ? mailboxById.get(folderActionsFolderId) ?? null : null),
+    [folderActionsFolderId, mailboxById]
+  );
+  const folderActionsIsSystemFolder = useMemo(() => ((folderActionsMailbox?.role ?? "").trim().length > 0 ? true : false), [
+    folderActionsMailbox
+  ]);
+  const folderActionsHasChildren = useMemo(() => {
+    if (!folderActionsFolderId) return false;
+    return (folderIndex.childrenByParent.get(folderActionsFolderId) ?? []).length > 0;
+  }, [folderActionsFolderId, folderIndex.childrenByParent]);
+
+  const showFolderUiError = (message: string) => {
+    setFolderUiError(message);
+    window.setTimeout(() => setFolderUiError((cur) => (cur === message ? null : cur)), 3000);
+  };
+
+  const openCreateFolder = (parentId: string | null) => {
+    setFolderOpError(null);
+    setFolderOpName("");
+    setFolderOpTargetId(null);
+    setFolderOpParentId(parentId);
+    setFolderOpMode("create");
+  };
+
+  const openRenameFolder = (targetId: string) => {
+    const target = folderIndex.byId.get(targetId);
+    if (!target) return;
+    setFolderOpError(null);
+    setFolderOpTargetId(targetId);
+    setFolderOpName(target.name);
+    setFolderOpParentId(null);
+    setFolderOpMode("rename");
+  };
+
+  const openDeleteFolder = (targetId: string) => {
+    if (!folderIndex.byId.has(targetId)) return;
+    setFolderOpError(null);
+    setFolderOpTargetId(targetId);
+    setFolderOpMode("delete");
+  };
+
+  const closeFolderOp = (opts?: { force?: boolean }) => {
+    if (folderOpBusy && !opts?.force) return;
+    setFolderOpMode(null);
+    setFolderOpError(null);
+    setFolderOpTargetId(null);
+    setFolderOpName("");
+    setFolderOpParentId(null);
+  };
+
+  const submitFolderOp = async () => {
+    if (!auth) return;
+    if (!folderOpMode) return;
+    if (folderOpBusy) return;
+    setFolderOpError(null);
+
+    const trimmedName = folderOpName.trim();
+    if (folderOpMode === "create" || folderOpMode === "rename") {
+      if (trimmedName.length === 0) {
+        setFolderOpError("Folder name is required.");
+        return;
+      }
+      if (trimmedName.includes("/") || trimmedName.includes("\\")) {
+        setFolderOpError("Please use a folder name without slashes. Nesting is handled by parent folders.");
+        return;
+      }
+    }
+
+    if (folderOpMode === "rename" || folderOpMode === "delete") {
+      if (!folderOpTargetId) {
+        setFolderOpError("No folder selected.");
+        return;
+      }
+      const role = (mailboxById.get(folderOpTargetId)?.role ?? "").trim();
+      if (role.length > 0) {
+        setFolderOpError("This is a system folder and cannot be modified.");
+        return;
+      }
+      if (folderOpMode === "delete") {
+        const hasChildren = (folderIndex.childrenByParent.get(folderOpTargetId) ?? []).length > 0;
+        if (hasChildren) {
+          setFolderOpError("This folder has subfolders. Delete (or move) subfolders first.");
+          return;
+        }
+      }
+    }
+
+    setFolderOpBusy(true);
+    try {
+      if (folderOpMode === "create") {
+        const { mailboxId } = await createMailbox({
+          apiUrl: auth.session.apiUrl,
+          authHeader: auth.authHeader,
+          accountId: auth.accountId,
+          name: trimmedName,
+          parentId: folderOpParentId ?? null
+        });
+        await loadMailboxes({ force: true });
+        setFolderId(mailboxId);
+        if (folderOpParentId) {
+          setOpenFolderIds((prev) => {
+            const next = new Set(prev);
+            next.add(folderOpParentId);
+            return next;
+          });
+        }
+        closeFolderOp({ force: true });
+        return;
+      }
+
+      if (folderOpMode === "rename") {
+        await renameMailbox({
+          apiUrl: auth.session.apiUrl,
+          authHeader: auth.authHeader,
+          accountId: auth.accountId,
+          mailboxId: folderOpTargetId!,
+          name: trimmedName
+        });
+        await loadMailboxes({ force: true });
+        closeFolderOp({ force: true });
+        return;
+      }
+
+      if (folderOpMode === "delete") {
+        await deleteMailbox({
+          apiUrl: auth.session.apiUrl,
+          authHeader: auth.authHeader,
+          accountId: auth.accountId,
+          mailboxId: folderOpTargetId!
+        });
+        await loadMailboxes({ force: true });
+        setFolderId((prev) => (prev === folderOpTargetId ? "" : prev));
+        closeFolderOp({ force: true });
+      }
+    } catch (err) {
+      setFolderOpError(err instanceof Error ? err.message : "Folder operation failed");
+    } finally {
+      setFolderOpBusy(false);
+    }
+  };
+
+  const canDropFolder = (dragId: string, newParentId: string | null): boolean => {
+    if (!dragId) return false;
+    if (newParentId === dragId) return false;
+    if (!newParentId) return true;
+    // Prevent cycles: you cannot drop a folder into its own descendant.
+    let cur: string | null | undefined = newParentId;
+    while (cur) {
+      if (cur === dragId) return false;
+      cur = folderIndex.byId.get(cur)?.parentId ?? null;
+    }
+    return true;
+  };
+
+  const performMoveFolder = async (dragId: string, newParentId: string | null) => {
+    if (!auth) return;
+    const role = (mailboxById.get(dragId)?.role ?? "").trim();
+    if (role.length > 0) {
+      showFolderUiError("System folders cannot be moved.");
+      return;
+    }
+    if (!canDropFolder(dragId, newParentId)) {
+      showFolderUiError("Invalid move (would create a loop).");
+      return;
+    }
+    try {
+      await moveMailbox({
+        apiUrl: auth.session.apiUrl,
+        authHeader: auth.authHeader,
+        accountId: auth.accountId,
+        mailboxId: dragId,
+        parentId: newParentId
+      });
+      await loadMailboxes({ force: true });
+      setFolderId(dragId);
+      if (newParentId) {
+        setOpenFolderIds((prev) => {
+          const next = new Set(prev);
+          next.add(newParentId);
+          return next;
+        });
+      }
+    } catch (err) {
+      showFolderUiError(err instanceof Error ? err.message : "Failed to move folder");
+    }
+  };
   const hasDraft = useMemo(() => composeMinimized, [composeMinimized]);
   const isComposeDirty = useMemo(() => {
     if (composeDraft.to.trim() !== "") return true;
@@ -383,6 +590,53 @@ export default function MailPage() {
     setExpandedIds(new Set());
     setExpandedAttachmentIds(new Set());
   }, [folderId]);
+
+  const loadMessages = async (opts?: { force?: boolean }) => {
+    if (!auth) return;
+    if (!folderId) return;
+    const targetFolderId = folderId;
+
+    setMessagesError(null);
+    setMessagesLoading(true);
+    try {
+      const res = await listEmailSummariesInMailbox({
+        apiUrl: auth.session.apiUrl,
+        authHeader: auth.authHeader,
+        accountId: auth.accountId,
+        mailboxId: targetFolderId,
+        limit: 50,
+        force: opts?.force
+      });
+      // If user switched folders mid-request, ignore the result.
+      if (targetFolderId !== folderId) return;
+      setMessages(res.emails.map(toMessage));
+      setMessagesTotal(typeof res.total === "number" ? res.total : null);
+      setBodyErrors({});
+      setBodyLoadingIds(new Set());
+    } catch (err) {
+      if (targetFolderId !== folderId) return;
+      setMessagesError(err instanceof Error ? err.message : "Failed to load emails");
+      setMessages([]);
+      setMessagesTotal(null);
+    } finally {
+      if (targetFolderId === folderId) setMessagesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!auth) return;
+    if (!folderId) {
+      setMessages([]);
+      setMessagesTotal(null);
+      setMessagesError(null);
+      setMessagesLoading(false);
+      setBodyErrors({});
+      setBodyLoadingIds(new Set());
+      return;
+    }
+    void loadMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth?.accountId, auth?.authHeader, auth?.session.apiUrl, folderId]);
 
   useEffect(() => {
     // Always close the picker after selecting a folder.
@@ -442,6 +696,42 @@ export default function MailPage() {
   };
 
   const toggleExpanded = (messageId: string) => {
+    const ensureBodyLoaded = async () => {
+      if (!auth) return;
+      setBodyErrors((prev) => {
+        if (!prev[messageId]) return prev;
+        const next = { ...prev };
+        delete next[messageId];
+        return next;
+      });
+      setBodyLoadingIds((prev) => {
+        if (prev.has(messageId)) return prev;
+        const next = new Set(prev);
+        next.add(messageId);
+        return next;
+      });
+
+      try {
+        const body = await getEmailBody({
+          apiUrl: auth.session.apiUrl,
+          authHeader: auth.authHeader,
+          accountId: auth.accountId,
+          emailId: messageId
+        });
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, html: body.html ?? m.html, text: body.text ?? m.text } : m))
+        );
+      } catch (err) {
+        setBodyErrors((prev) => ({ ...prev, [messageId]: err instanceof Error ? err.message : "Failed to load message body" }));
+      } finally {
+        setBodyLoadingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(messageId);
+          return next;
+        });
+      }
+    };
+
     setExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(messageId)) {
@@ -451,7 +741,10 @@ export default function MailPage() {
           nextAttachments.delete(messageId);
           return nextAttachments;
         });
-      } else next.add(messageId);
+      } else {
+        next.add(messageId);
+        void ensureBodyLoaded();
+      }
       return next;
     });
   };
@@ -550,7 +843,30 @@ export default function MailPage() {
             </label>
           </div>
 
-          <div className={styles.folderTree} role="tree" aria-label="Folders">
+          <div
+            className={styles.folderTree}
+            role="tree"
+            aria-label="Folders"
+            onDragOver={(e) => {
+              if (!draggingFolderId) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+            }}
+            onDrop={(e) => {
+              if (!draggingFolderId) return;
+              if (e.target !== e.currentTarget) return;
+              e.preventDefault();
+              const dragId = draggingFolderId ?? e.dataTransfer.getData("text/plain");
+              setDraggingFolderId(null);
+              setDropTargetFolderId(null);
+              void performMoveFolder(dragId, null);
+            }}
+          >
+            {folderUiError && (
+              <div className={styles.errorState} role="alert">
+                {folderUiError}
+              </div>
+            )}
             {mailboxesLoading ? (
               <div className={styles.loadingState} aria-live="polite">
                 <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
@@ -578,14 +894,50 @@ export default function MailPage() {
 
                     return (
                       <div key={f.id} className={styles.folderNode}>
-                        <button
-                          type="button"
+                        <div
                           role="treeitem"
                           aria-level={depth + 1}
                           aria-expanded={hasChildren ? isOpen : undefined}
-                          className={`${styles.folderItem} ${active ? styles.folderItemActive : ""}`}
-                          onClick={() => setFolderId(f.id)}
+                          className={`${styles.folderItem} ${active ? styles.folderItemActive : ""} ${
+                            dropTargetFolderId === f.id ? styles.folderItemDropTarget : ""
+                          }`}
+                          tabIndex={0}
                           aria-current={active ? "page" : undefined}
+                          draggable={(mailboxById.get(f.id)?.role ?? "").trim().length === 0}
+                          onDragStart={(e) => {
+                            setDraggingFolderId(f.id);
+                            e.dataTransfer.setData("text/plain", f.id);
+                            e.dataTransfer.effectAllowed = "move";
+                          }}
+                          onDragEnd={() => {
+                            setDraggingFolderId(null);
+                            setDropTargetFolderId(null);
+                          }}
+                          onDragEnter={(e) => {
+                            if (!draggingFolderId) return;
+                            e.preventDefault();
+                            setDropTargetFolderId(f.id);
+                          }}
+                          onDragOver={(e) => {
+                            if (!draggingFolderId) return;
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const dragId = draggingFolderId ?? e.dataTransfer.getData("text/plain");
+                            setDraggingFolderId(null);
+                            setDropTargetFolderId(null);
+                            void performMoveFolder(dragId, f.id);
+                          }}
+                          onClick={() => setFolderId(f.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setFolderId(f.id);
+                            }
+                          }}
                         >
                           <span className={styles.folderLabel} style={{ paddingLeft: `${10 + depth * 14}px` }}>
                             <span
@@ -621,8 +973,20 @@ export default function MailPage() {
                             </span>
                             <span className={styles.folderNameText}>{f.name}</span>
                           </span>
-                          {f.unread > 0 && <span className={styles.unreadPill}>{f.unread}</span>}
-                        </button>
+                          <span className={styles.folderRight} onClick={(e) => e.stopPropagation()}>
+                            {f.unread > 0 && <span className={styles.unreadPill}>{f.unread}</span>}
+                            <button
+                              type="button"
+                              className={`${styles.iconButton} ${styles.folderMoreButton}`}
+                              aria-label={`Folder actions ${f.name}`}
+                              title="Folder actions"
+                              onClick={() => setFolderActionsFolderId(f.id)}
+                              onFocus={() => setDropTargetFolderId(null)}
+                            >
+                              <MoreHorizontal className={styles.icon} aria-hidden="true" />
+                            </button>
+                          </span>
+                        </div>
 
                         {hasChildren && isOpen && (
                           <div role="group" className={styles.folderChildren}>
@@ -657,7 +1021,7 @@ export default function MailPage() {
         <header className={styles.topbar}>
           <div className={styles.topbarLeft}>
             <div className={styles.currentFolder}>
-              {folder.name} <span className={styles.count}>({messages.length})</span>
+              {folder.name} <span className={styles.count}>({messagesTotal ?? messages.length})</span>
             </div>
 
             <button
@@ -673,7 +1037,7 @@ export default function MailPage() {
                 🦆
               </span>
               <span className={styles.folderSwitcherName}>{folder.name}</span>
-              <span className={styles.count}>({messages.length})</span>
+              <span className={styles.count}>({messagesTotal ?? messages.length})</span>
               <ChevronDown className={`${styles.icon} ${styles.folderSwitcherChevron}`} aria-hidden="true" />
             </button>
           </div>
@@ -704,7 +1068,22 @@ export default function MailPage() {
         </header>
 
         <section className={styles.list} aria-label="Message list">
-        {messages.map((msg) => {
+          {messagesLoading ? (
+            <div className={styles.loadingState} aria-live="polite">
+              <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
+              Loading emails…
+            </div>
+          ) : messagesError ? (
+            <div className={styles.errorState} role="alert">
+              {messagesError}{" "}
+              <button type="button" className={styles.secondaryButton} onClick={() => void loadMessages({ force: true })}>
+                Retry
+              </button>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className={styles.emptyState}>No emails in this folder.</div>
+          ) : (
+            messages.map((msg) => {
           const isOpen = expandedIds.has(msg.id);
           const regionId = `message-body-${msg.id}`;
           return (
@@ -738,14 +1117,13 @@ export default function MailPage() {
                         {formatListArrivalTime(msg.receivedAt)}
                       </div>
                       <div className={styles.rightMetaActions}>
-                        {msg.attachments.length > 0 && (
+                        {msg.hasAttachments && (
                           <div
                             className={styles.attachmentIndicator}
-                            aria-label={`${msg.attachments.length} attachment${msg.attachments.length === 1 ? "" : "s"}`}
-                            title={`${msg.attachments.length} attachment${msg.attachments.length === 1 ? "" : "s"}`}
+                            aria-label="Has attachments"
+                            title="Has attachments"
                           >
                             <Paperclip className={styles.icon} aria-hidden="true" />
-                            <span className={styles.attachmentIndicatorCount}>{msg.attachments.length}</span>
                           </div>
                         )}
                         <button
@@ -846,11 +1224,23 @@ export default function MailPage() {
                   </div>
                 )}
 
-                <SafeEmailViewer htmlContent={msg.html ?? ""} textContent={msg.text ?? ""} />
+                {bodyLoadingIds.has(msg.id) ? (
+                  <div className={styles.bodyLoading} aria-live="polite">
+                    <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
+                    Loading message…
+                  </div>
+                ) : bodyErrors[msg.id] ? (
+                  <div className={styles.errorState} role="alert">
+                    {bodyErrors[msg.id]}
+                  </div>
+                ) : (
+                  <SafeEmailViewer htmlContent={msg.html ?? ""} textContent={msg.text ?? ""} />
+                )}
               </div>
             </div>
           );
-        })}
+            })
+          )}
         </section>
       </section>
 
@@ -937,19 +1327,21 @@ export default function MailPage() {
                 </span>
               </button>
 
-              <button
-                className={styles.sendMenuItem}
-                type="button"
-                onClick={() => {
-                  triggerDownload(`${rowActionsMessage.subject}.eml`, "message/rfc822", rowActionsMessage.rawSource);
-                  setRowActionsMessageId(null);
-                }}
-              >
-                <span className={styles.sendMenuItemRow}>
-                  <FileDown className={styles.icon} aria-hidden="true" />
-                  Download source (.eml)
-                </span>
-              </button>
+              {rowActionsMessage.rawSource.trim() !== "" && (
+                <button
+                  className={styles.sendMenuItem}
+                  type="button"
+                  onClick={() => {
+                    triggerDownload(`${rowActionsMessage.subject}.eml`, "message/rfc822", rowActionsMessage.rawSource);
+                    setRowActionsMessageId(null);
+                  }}
+                >
+                  <span className={styles.sendMenuItemRow}>
+                    <FileDown className={styles.icon} aria-hidden="true" />
+                    Download source (.eml)
+                  </span>
+                </button>
+              )}
 
               <button
                 className={styles.sendMenuItem}
@@ -962,6 +1354,115 @@ export default function MailPage() {
                 <span className={styles.sendMenuItemRow}>
                   <Trash2 className={styles.icon} aria-hidden="true" />
                   Delete
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {folderActionsFolderId && folderActionsFolder && (
+        <div
+          className={styles.sheetOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Folder actions"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setFolderActionsFolderId(null);
+          }}
+        >
+          <div className={styles.sheet} role="document">
+            <div className={styles.sheetHeader}>
+              <div className={styles.sheetTitle}>Actions</div>
+            </div>
+            <div className={styles.sheetBody}>
+              <div className={styles.listTitle} style={{ padding: "0 2px 6px" }}>
+                🦆 {folderActionsFolder.name}
+              </div>
+
+              <button
+                className={styles.sendMenuItem}
+                type="button"
+                onClick={() => {
+                  const parentId = folderActionsFolderId;
+                  setFolderActionsFolderId(null);
+                  openCreateFolder(parentId);
+                }}
+              >
+                <span className={styles.sendMenuItemRow}>
+                  <Plus className={styles.icon} aria-hidden="true" />
+                  New subfolder
+                </span>
+              </button>
+
+              <button
+                className={styles.sendMenuItem}
+                type="button"
+                disabled={folderActionsIsSystemFolder}
+                title={folderActionsIsSystemFolder ? "System folder cannot be renamed" : "Rename folder"}
+                onClick={() => {
+                  const id = folderActionsFolderId;
+                  setFolderActionsFolderId(null);
+                  openRenameFolder(id);
+                }}
+              >
+                <span className={styles.sendMenuItemRow}>
+                  <Pencil className={styles.icon} aria-hidden="true" />
+                  Rename
+                </span>
+              </button>
+
+              <button
+                className={styles.sendMenuItem}
+                type="button"
+                disabled={folderActionsIsSystemFolder || folderActionsHasChildren}
+                title={
+                  folderActionsIsSystemFolder
+                    ? "System folder cannot be deleted"
+                    : folderActionsHasChildren
+                      ? "Delete subfolders first"
+                      : "Delete folder"
+                }
+                onClick={() => {
+                  const id = folderActionsFolderId;
+                  setFolderActionsFolderId(null);
+                  openDeleteFolder(id);
+                }}
+              >
+                <span className={styles.sendMenuItemRow}>
+                  <Trash2 className={styles.icon} aria-hidden="true" />
+                  Delete
+                </span>
+              </button>
+
+              <button
+                className={styles.sendMenuItem}
+                type="button"
+                disabled={folderActionsIsSystemFolder}
+                title={folderActionsIsSystemFolder ? "System folder cannot be moved" : "Move to root"}
+                onClick={() => {
+                  const id = folderActionsFolderId;
+                  setFolderActionsFolderId(null);
+                  void performMoveFolder(id, null);
+                }}
+              >
+                <span className={styles.sendMenuItemRow}>
+                  <ChevronDown className={styles.icon} aria-hidden="true" />
+                  Move to root
+                </span>
+              </button>
+
+              <button
+                className={styles.sendMenuItem}
+                type="button"
+                onClick={() => {
+                  setFolderActionsFolderId(null);
+                  openCreateFolder(null);
+                }}
+              >
+                <span className={styles.sendMenuItemRow}>
+                  <Plus className={styles.icon} aria-hidden="true" />
+                  New folder (root)
                 </span>
               </button>
             </div>
@@ -1015,7 +1516,30 @@ export default function MailPage() {
                 </label>
               </div>
 
-              <div className={styles.folderTree} role="tree" aria-label="Folders">
+              <div
+                className={styles.folderTree}
+                role="tree"
+                aria-label="Folders"
+                onDragOver={(e) => {
+                  if (!draggingFolderId) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                }}
+                onDrop={(e) => {
+                  if (!draggingFolderId) return;
+                  if (e.target !== e.currentTarget) return;
+                  e.preventDefault();
+                  const dragId = draggingFolderId ?? e.dataTransfer.getData("text/plain");
+                  setDraggingFolderId(null);
+                  setDropTargetFolderId(null);
+                  void performMoveFolder(dragId, null);
+                }}
+              >
+                {folderUiError && (
+                  <div className={styles.errorState} role="alert">
+                    {folderUiError}
+                  </div>
+                )}
                 {mailboxesLoading ? (
                   <div className={styles.loadingState} aria-live="polite">
                     <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
@@ -1043,14 +1567,50 @@ export default function MailPage() {
 
                         return (
                           <div key={f.id} className={styles.folderNode}>
-                            <button
-                              type="button"
+                            <div
                               role="treeitem"
                               aria-level={depth + 1}
                               aria-expanded={hasChildren ? isOpen : undefined}
-                              className={`${styles.sheetFolderItem} ${active ? styles.sheetFolderItemActive : ""}`}
-                              onClick={() => setFolderId(f.id)}
+                              className={`${styles.sheetFolderItem} ${active ? styles.sheetFolderItemActive : ""} ${
+                                dropTargetFolderId === f.id ? styles.folderItemDropTarget : ""
+                              }`}
+                              tabIndex={0}
                               aria-current={active ? "page" : undefined}
+                              draggable={(mailboxById.get(f.id)?.role ?? "").trim().length === 0}
+                              onDragStart={(e) => {
+                                setDraggingFolderId(f.id);
+                                e.dataTransfer.setData("text/plain", f.id);
+                                e.dataTransfer.effectAllowed = "move";
+                              }}
+                              onDragEnd={() => {
+                                setDraggingFolderId(null);
+                                setDropTargetFolderId(null);
+                              }}
+                              onDragEnter={(e) => {
+                                if (!draggingFolderId) return;
+                                e.preventDefault();
+                                setDropTargetFolderId(f.id);
+                              }}
+                              onDragOver={(e) => {
+                                if (!draggingFolderId) return;
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = "move";
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const dragId = draggingFolderId ?? e.dataTransfer.getData("text/plain");
+                                setDraggingFolderId(null);
+                                setDropTargetFolderId(null);
+                                void performMoveFolder(dragId, f.id);
+                              }}
+                              onClick={() => setFolderId(f.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  setFolderId(f.id);
+                                }
+                              }}
                             >
                               <span className={styles.folderLabel} style={{ paddingLeft: `${10 + depth * 14}px` }}>
                                 <span
@@ -1086,8 +1646,19 @@ export default function MailPage() {
                                 </span>
                                 <span className={styles.folderNameText}>{f.name}</span>
                               </span>
-                              {f.unread > 0 && <span className={styles.unreadPill}>{f.unread}</span>}
-                            </button>
+                              <span className={styles.folderRight} onClick={(e) => e.stopPropagation()}>
+                                {f.unread > 0 && <span className={styles.unreadPill}>{f.unread}</span>}
+                                <button
+                                  type="button"
+                                  className={`${styles.iconButton} ${styles.folderMoreButton}`}
+                                  aria-label={`Folder actions ${f.name}`}
+                                  title="Folder actions"
+                                  onClick={() => setFolderActionsFolderId(f.id)}
+                                >
+                                  <MoreHorizontal className={styles.icon} aria-hidden="true" />
+                                </button>
+                              </span>
+                            </div>
 
                             {hasChildren && isOpen && (
                               <div role="group" className={styles.folderChildren}>
@@ -1368,6 +1939,96 @@ export default function MailPage() {
               >
                 Save draft
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {folderOpMode && (
+        <div
+          className={styles.confirmOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label={
+            folderOpMode === "create" ? "Create folder" : folderOpMode === "rename" ? "Rename folder" : "Delete folder"
+          }
+          onMouseDown={(e) => {
+            if (folderOpBusy) return;
+            if (e.target === e.currentTarget) closeFolderOp();
+          }}
+        >
+          <div className={styles.folderOpModal} role="document">
+            <div className={styles.confirmTitle}>
+              {folderOpMode === "create" ? "New folder" : folderOpMode === "rename" ? "Rename folder" : "Delete folder"}
+            </div>
+
+            {folderOpError && (
+              <div className={styles.folderOpError} role="alert">
+                {folderOpError}
+              </div>
+            )}
+
+            {folderOpMode === "delete" ? (
+              <div className={styles.confirmBody}>
+                Delete <strong>{folderIndex.byId.get(folderOpTargetId ?? "")?.name ?? "this folder"}</strong>? This can’t be undone.
+              </div>
+            ) : (
+              <div className={styles.folderOpForm}>
+                {folderOpMode === "create" && (
+                  <label className={styles.folderOpField}>
+                    <span className={styles.folderOpLabel}>Parent</span>
+                    <select
+                      className={styles.input}
+                      value={folderOpParentId ?? ""}
+                      onChange={(e) => setFolderOpParentId(e.target.value === "" ? null : e.target.value)}
+                      disabled={folderOpBusy}
+                    >
+                      <option value="">(Root)</option>
+                      {folderOptions.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {`${"— ".repeat(o.depth)}${o.label}`}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                <label className={styles.folderOpField}>
+                  <span className={styles.folderOpLabel}>Name</span>
+                  <input
+                    className={styles.input}
+                    type="text"
+                    value={folderOpName}
+                    onChange={(e) => setFolderOpName(e.target.value)}
+                    placeholder={folderOpMode === "create" ? "e.g. Receipts" : undefined}
+                    autoFocus
+                    disabled={folderOpBusy}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void submitFolderOp();
+                    }}
+                  />
+                </label>
+              </div>
+            )}
+
+            <div className={styles.confirmActions}>
+              <button type="button" className={styles.secondaryButton} onClick={() => closeFolderOp()} disabled={folderOpBusy}>
+                Cancel
+              </button>
+              {folderOpMode === "delete" ? (
+                <button
+                  type="button"
+                  className={`${styles.secondaryButton} ${styles.dangerAction}`}
+                  onClick={() => void submitFolderOp()}
+                  disabled={folderOpBusy}
+                >
+                  {folderOpBusy ? "Deleting…" : "Delete"}
+                </button>
+              ) : (
+                <button type="button" className={styles.primaryButton} onClick={() => void submitFolderOp()} disabled={folderOpBusy}>
+                  {folderOpMode === "create" ? (folderOpBusy ? "Creating…" : "Create") : folderOpBusy ? "Saving…" : "Save"}
+                </button>
+              )}
             </div>
           </div>
         </div>
