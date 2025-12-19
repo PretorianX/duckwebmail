@@ -3,66 +3,65 @@
   background: var(--background-color);
   color: var(--text-color);
   display: grid;
+  grid-template-areas:
+    "header header"
+    "sidebar content";
   grid-template-columns: 260px 1fr;
+  grid-template-rows: auto 1fr;
+}
+
+.header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--card-background);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.headerLogo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+}
+
+.headerDuck {
+  font-size: 1.3em;
+  filter: saturate(1.05);
+}
+
+.headerBrand {
+  white-space: nowrap;
+}
+
+.headerSearch {
+  flex: 1 1 auto;
+  max-width: 520px;
+  min-width: 0;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
 }
 
 .sidebar {
+  grid-area: sidebar;
   border-right: 1px solid var(--border-color);
   background: var(--card-background);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-}
-
-.brandRow {
-  padding: 10px 10px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.brand {
-  font-weight: 900;
-  letter-spacing: 0.2px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-color);
-  border: none;
-  background: transparent;
-  padding: 6px 8px;
-  border-radius: 12px;
-  max-width: 100%;
-  min-width: 0;
-  text-align: left;
-}
-
-.brand:hover {
-  background: rgba(255, 204, 0, 0.08);
-}
-
-.brandDuck {
-  filter: saturate(1.05);
-}
-
-.brandName {
-  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.brandChevron {
-  color: var(--light-text);
-  flex: 0 0 auto;
-}
-
-.sidebarActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.mobileTopbar {
+  display: none;
 }
 
 .folders {
@@ -72,6 +71,50 @@
   gap: 8px;
   flex: 1 1 auto;
   overflow: auto;
+}
+
+.sidebarFooter {
+  padding: 10px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: center;
+}
+
+.sidebarCompose {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: var(--accent-color);
+  color: #121620;
+  border: none;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.sidebarCompose:hover {
+  filter: brightness(1.02);
+}
+
+.sidebarCompose .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.sidebarDraftPill {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 950;
+  background: rgba(18, 22, 32, 0.18);
+  color: #121620;
 }
 
 .folderFilterRow {
@@ -279,58 +322,12 @@
   color: #121620;
 }
 
-.sidebarFooter {
-  margin-top: auto;
-  padding: 10px;
-  border-top: 1px solid var(--border-color);
-}
-
-.logout {
-  width: 100%;
-  border-radius: 12px;
-  padding: 10px 10px;
-  border: 1px solid var(--border-color);
-  background: transparent;
-  color: var(--text-color);
-  font-weight: 800;
-}
-
-.logout:hover {
-  border-color: rgba(255, 204, 0, 0.45);
-  background: rgba(255, 204, 0, 0.08);
-}
-
 .content {
+  grid-area: content;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-}
-
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: grid;
-  grid-template-columns: 1fr minmax(220px, 520px) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 12px;
-  background: var(--background-color);
-  border-bottom: 1px solid var(--border-color);
-  backdrop-filter: blur(10px);
-}
-
-.topbarLeft {
-  min-width: 0;
-}
-
-.currentFolder {
-  font-weight: 900;
-  letter-spacing: 0.2px;
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .folderSwitcher {
@@ -340,10 +337,6 @@
 .count {
   color: var(--light-text);
   font-weight: 700;
-}
-
-.topbarCenter {
-  min-width: 0;
 }
 
 .searchLabel {
@@ -364,16 +357,6 @@
 .search:focus {
   border-color: rgba(255, 204, 0, 0.65);
   box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.22);
-}
-
-.topbarRight {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.topbarTools {
-  display: none;
 }
 
 .composeButton {
@@ -565,6 +548,39 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.appFooter {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  color: var(--light-text);
+  background: var(--card-background);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.footerQuota {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.footerQuotaLoading {
+  font-style: italic;
+}
+
+.footerQuotaItem {
+  font-weight: 700;
+}
+
+.footerCopyright {
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .loadingState,
@@ -1338,32 +1354,31 @@
 
 @media (max-width: 880px) {
   .shell {
+    grid-template-areas: "content";
     grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+  }
+
+  .header {
+    display: none;
   }
 
   .sidebar {
     display: none;
   }
 
-  .sidebarFooter {
-    display: none;
-  }
-
-  .topbar {
-    grid-template-columns: 1fr auto;
+  .mobileTopbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
     padding-top: calc(10px + env(safe-area-inset-top));
-  }
-
-  .topbarCenter {
-    display: none;
-  }
-
-  .currentFolder {
-    display: none;
+    background: var(--card-background);
+    border-bottom: 1px solid var(--border-color);
   }
 
   .folderSwitcher {
-    width: 100%;
+    flex: 1 1 auto;
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -1400,15 +1415,6 @@
     flex: 0 0 auto;
   }
 
-  .composeButton {
-    display: none;
-  }
-
-  .topbarTools {
-    display: inline-flex;
-    align-items: center;
-  }
-
   .composeDock {
     display: inline-flex;
     bottom: calc(14px + env(safe-area-inset-bottom));
@@ -1416,6 +1422,10 @@
 
   .list {
     padding-bottom: calc(86px + env(safe-area-inset-bottom));
+  }
+
+  .appFooter {
+    display: none;
   }
 
   .rowGrid {

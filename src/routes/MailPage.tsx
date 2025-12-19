@@ -22,13 +22,13 @@ import {
   X
 } from "lucide-react";
 
-import ThemeToggle from "../theme/ThemeToggle";
 import ProfileMenu from "../shared/ProfileMenu";
 import SafeEmailViewer from "../shared/SafeEmailViewer";
 import ComposeEditor from "../shared/ComposeEditor";
 import { useAuth } from "../auth/AuthContext";
 import { getPrimarySubmissionAccountId } from "../jmap/normalizeSession";
 import { createMailbox, deleteMailbox, getMailboxes, moveMailbox, renameMailbox, type JmapMailbox } from "../jmap/mailbox";
+import { formatQuotaBytes, getQuotaPercentage, getQuotas, type JmapQuota } from "../jmap/quota";
 import { getDraftsMailboxId, getOrCreateIdentity, sendEmailSubmission, upsertDraftEmail } from "../jmap/compose";
 import {
   clearEmailListCacheForAccount,
@@ -70,10 +70,41 @@ type Message = {
   text?: string;
 };
 
+/**
+ * Sorts mailboxes with the following priority:
+ * 1. Inbox always first
+ * 2. Role/system folders by fixed priority (drafts, sent, archive, trash, junk/spam)
+ * 3. Remaining user folders alphabetically by name
+ */
 function sortMailboxes(a: JmapMailbox, b: JmapMailbox): number {
-  const sa = a.sortOrder ?? 0;
-  const sb = b.sortOrder ?? 0;
-  if (sa !== sb) return sa - sb;
+  const rolePriority: Record<string, number> = {
+    inbox: 0,
+    drafts: 1,
+    sent: 2,
+    archive: 3,
+    trash: 4,
+    junk: 5,
+    spam: 5
+  };
+
+  const roleA = (a.role ?? "").toLowerCase();
+  const roleB = (b.role ?? "").toLowerCase();
+
+  const priorityA = rolePriority[roleA] ?? 100;
+  const priorityB = rolePriority[roleB] ?? 100;
+
+  // If both have role priority, sort by that
+  if (priorityA !== priorityB) return priorityA - priorityB;
+
+  // If both are system folders with same priority, use sortOrder then name
+  if (priorityA < 100 && priorityB < 100) {
+    const sa = a.sortOrder ?? 0;
+    const sb = b.sortOrder ?? 0;
+    if (sa !== sb) return sa - sb;
+    return a.name.localeCompare(b.name);
+  }
+
+  // Both are user folders - sort alphabetically
   return a.name.localeCompare(b.name);
 }
 
@@ -252,6 +283,11 @@ export default function MailPage() {
   const [mailboxes, setMailboxes] = useState<JmapMailbox[]>([]);
   const mailboxById = useMemo(() => new Map(mailboxes.map((m) => [m.id, m])), [mailboxes]);
 
+  // Quota state
+  const [quotaLoading, setQuotaLoading] = useState(false);
+  const [quotaError, setQuotaError] = useState<string | null>(null);
+  const [quotas, setQuotas] = useState<JmapQuota[]>([]);
+
   const loadMailboxes = async (opts?: { force?: boolean }) => {
     if (!auth) return;
     setMailboxesError(null);
@@ -275,6 +311,33 @@ export default function MailPage() {
 
   useEffect(() => {
     void loadMailboxes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth?.accountId, auth?.authHeader, auth?.session.apiUrl]);
+
+  const loadQuotas = async (opts?: { force?: boolean }) => {
+    if (!auth) return;
+    setQuotaError(null);
+    setQuotaLoading(true);
+    try {
+      const res = await getQuotas({
+        apiUrl: auth.session.apiUrl,
+        authHeader: auth.authHeader,
+        accountId: auth.accountId,
+        force: opts?.force
+      });
+      setQuotas(res.quotas);
+    } catch (err) {
+      // Quota capability may not be available on all servers - silently fail
+      console.log("[Quota] Failed to load quotas:", err instanceof Error ? err.message : err);
+      setQuotaError(err instanceof Error ? err.message : "Failed to load quotas");
+      setQuotas([]);
+    } finally {
+      setQuotaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadQuotas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth?.accountId, auth?.authHeader, auth?.session.apiUrl]);
 
@@ -1210,29 +1273,23 @@ export default function MailPage() {
 
   return (
     <main className={styles.shell}>
-      <aside className={styles.sidebar} aria-label="Folders">
-        <div className={styles.brandRow}>
-          <button
-            type="button"
-            className={styles.brand}
-            onClick={() => setFolderPickerOpen(true)}
-            aria-haspopup="dialog"
-            aria-expanded={folderPickerOpen}
-            aria-controls="folder-picker"
-            title="Change folder"
-          >
-            <span className={styles.brandDuck} aria-hidden="true">
-              🦆
-            </span>
-            <span className={styles.brandName}>{folder.name}</span>
-            <ChevronDown className={`${styles.icon} ${styles.brandChevron}`} aria-hidden="true" />
-          </button>
-          <div className={styles.sidebarActions}>
-            <ThemeToggle />
-            <ProfileMenu />
-          </div>
+      <header className={styles.header}>
+        <div className={styles.headerLogo}>
+          <span className={styles.headerDuck} aria-hidden="true">🦆</span>
+          <span className={styles.headerBrand}>Duckmail</span>
         </div>
+        <div className={styles.headerSearch}>
+          <label className={styles.searchLabel}>
+            <span className={styles.srOnly}>Search</span>
+            <input className={styles.search} placeholder="Search mail…" />
+          </label>
+        </div>
+        <div className={styles.headerActions}>
+          <ProfileMenu />
+        </div>
+      </header>
 
+      <aside className={styles.sidebar} aria-label="Folders">
         <nav className={styles.folders} aria-label="Folders">
           <div className={styles.folderFilterRow}>
             <label className={styles.folderFilterLabel}>
@@ -1418,67 +1475,40 @@ export default function MailPage() {
 
         <div className={styles.sidebarFooter}>
           <button
-            className={styles.logout}
+            className={styles.sidebarCompose}
             type="button"
             onClick={() => {
-              signOut();
-              navigate("/login");
+              if (composeMinimized) resumeCompose();
+              else beginCompose({ to: "", subject: "", body: "" });
             }}
           >
-            ← Sign out
+            <Pencil className={styles.icon} aria-hidden="true" />
+            <span>Compose</span>
+            {hasDraft && <span className={styles.sidebarDraftPill}>1</span>}
           </button>
         </div>
       </aside>
 
       <section className={styles.content}>
-        <header className={styles.topbar}>
-          <div className={styles.topbarLeft}>
-            <div className={styles.currentFolder}>
-              {folder.name} <span className={styles.count}>({messagesTotal ?? messages.length})</span>
-            </div>
-
-            <button
-              type="button"
-              className={styles.folderSwitcher}
-              onClick={() => setFolderPickerOpen(true)}
-              aria-haspopup="dialog"
-              aria-expanded={folderPickerOpen}
-              aria-controls="folder-picker"
-              title="Change folder"
-            >
-              <span className={styles.folderSwitcherDuck} aria-hidden="true">
-                🦆
-              </span>
-              <span className={styles.folderSwitcherName}>{folder.name}</span>
-              <span className={styles.count}>({messagesTotal ?? messages.length})</span>
-              <ChevronDown className={`${styles.icon} ${styles.folderSwitcherChevron}`} aria-hidden="true" />
-            </button>
-          </div>
-
-          <div className={styles.topbarCenter}>
-            <label className={styles.searchLabel}>
-              <span className={styles.srOnly}>Search</span>
-              <input className={styles.search} placeholder="Search mail…" />
-            </label>
-          </div>
-
-          <div className={styles.topbarRight}>
-            <div className={styles.topbarTools}>
-              <ProfileMenu />
-            </div>
-            <button
-              className={styles.composeButton}
-              type="button"
-              onClick={() => {
-                if (composeMinimized) resumeCompose();
-                else beginCompose({ to: "", subject: "", body: "" });
-              }}
-            >
-              <span className={styles.composeButtonLabel}>Compose</span>
-              {hasDraft && <span className={styles.draftPill}>Draft: 1</span>}
-            </button>
-          </div>
-        </header>
+        <div className={styles.mobileTopbar}>
+          <button
+            type="button"
+            className={styles.folderSwitcher}
+            onClick={() => setFolderPickerOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={folderPickerOpen}
+            aria-controls="folder-picker"
+            title="Change folder"
+          >
+            <span className={styles.folderSwitcherDuck} aria-hidden="true">
+              🦆
+            </span>
+            <span className={styles.folderSwitcherName}>{folder.name}</span>
+            <span className={styles.count}>({messagesTotal ?? messages.length})</span>
+            <ChevronDown className={`${styles.icon} ${styles.folderSwitcherChevron}`} aria-hidden="true" />
+          </button>
+          <ProfileMenu />
+        </div>
 
         <section className={styles.list} aria-label="Message list">
           {messagesLoading ? (
@@ -1655,6 +1685,26 @@ export default function MailPage() {
             })
           )}
         </section>
+
+        <footer className={styles.appFooter}>
+          <div className={styles.footerQuota}>
+            {quotaLoading ? (
+              <span className={styles.footerQuotaLoading}>Loading…</span>
+            ) : quotaError ? null : (() => {
+              const storageQuota = quotas.find((q) => q.resourceType === "octets");
+              if (!storageQuota) return null;
+              const limitText = storageQuota.hardLimit ? formatQuotaBytes(storageQuota.hardLimit) : "unlimited";
+              return (
+                <span className={styles.footerQuotaItem}>
+                  Space used: {formatQuotaBytes(storageQuota.used)} / {limitText}
+                </span>
+              );
+            })()}
+          </div>
+          <div className={styles.footerCopyright}>
+            © {new Date().getFullYear()} Duckwebmail 🦆
+          </div>
+        </footer>
       </section>
 
       {rowActionsMessage && (
