@@ -74,6 +74,7 @@ ${schemeCss}
   body {
     margin: 0;
     font-family:
+      'Noto Sans',
       'Inter',
       'Nunito',
       system-ui,
@@ -87,6 +88,13 @@ ${schemeCss}
     line-height: 1.6;
     background-color: var(--background-color);
     color: var(--text-color);
+  }
+
+  @media screen and (min-width: 1024px) {
+    body {
+      font-size: 14px;
+      line-height: 1.35;
+    }
   }
 
   button, input, textarea, select {

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Prefer Noto Sans as primary typeface (multilingual support) and apply compact desktop typography (14px base, 1.35 line-height) plus tighter spacing for folder list and email rows on screens ≥1024px.
 - Add UI localization (i18n) with language switcher and browser auto-detect; supports English, Spanish, Ukrainian, and Russian; persist preference under `duckwebmail:lang`.
 - Add `docker-compose.prod.yml` for production (nginx + certbot + Stalwart + DuckWebmail UI) with hardened defaults, healthchecks, and Let’s Encrypt volumes/webroot wiring.
 - Expand production operations docs: initial cert issuance, host-driven renew + reload, and backup guidance for Stalwart data + Let’s Encrypt state.

@@ -1560,6 +1560,61 @@
   }
 }
 
+@media screen and (min-width: 1024px) {
+  .folders {
+    padding: 6px 6px 8px;
+    gap: 4px;
+  }
+
+  .folderTree {
+    gap: 2px;
+  }
+
+  .folderChildren {
+    gap: 2px;
+  }
+
+  .folderItem {
+    padding-top: 4px;
+    padding-bottom: 4px;
+    padding-left: 8px;
+    padding-right: 8px;
+    margin-bottom: 2px;
+  }
+
+  .folderLabel {
+    font-weight: 500;
+  }
+
+  .list {
+    padding: 6px 10px;
+  }
+
+  .rowGrid {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .subject {
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .date {
+    font-size: 12px;
+    line-height: 1.2;
+    opacity: 0.8;
+  }
+
+  .from {
+    font-size: 12px;
+    line-height: 1.2;
+    opacity: 0.8;
+  }
+}
+
 @media (max-width: 880px) {
   .shell {
     grid-template-areas: "content";
