@@ -38,6 +38,7 @@ import {
   clearEmailListCacheForAccount,
   destroyEmail,
   formatAddressList,
+  formatSenderForList,
   getEmailBody,
   isStarred,
   isUnread,
@@ -64,6 +65,7 @@ type Attachment = {
 type Message = {
   id: string;
   from: string;
+  fromRaw?: JmapEmailSummary["from"];
   to: string;
   subject: string;
   preview: string;
@@ -140,6 +142,7 @@ function toMessage(email: JmapEmailSummary): Message {
   return {
     id: email.id,
     from: from || "(no sender)",
+    fromRaw: email.from,
     to,
     subject: subject || "(no subject)",
     preview,
@@ -1938,38 +1941,44 @@ export default function MailPage() {
                 }}
               >
                 <div className={styles.rowGrid}>
-                  <div className={styles.bimi} aria-hidden="true" title="BIMI">
-                    {getBimiInitial(msg.from)}
+                  <div className={styles.bimi} data-col="icon" aria-hidden="true" title="BIMI">
+                    {getBimiInitial(formatSenderForList(msg.fromRaw) || msg.from)}
                   </div>
-                  <div className={`${styles.from} ${msg.unread ? styles.unreadText : ""}`}>{msg.from}</div>
-                  <div className={styles.summary}>
+                  <div className={`${styles.from} ${msg.unread ? styles.unreadText : ""}`} data-col="from">
+                    {formatSenderForList(msg.fromRaw) || "(no sender)"}
+                  </div>
+                  <div className={styles.summary} data-col="subject">
                     <span className={`${styles.subject} ${msg.unread ? styles.unreadText : ""}`}>{msg.subject}</span>
+                    {msg.preview && (
+                      <>
+                        <span className={styles.summarySep}> — </span>
+                        <span className={styles.preview}>{msg.preview}</span>
+                      </>
+                    )}
                   </div>
-                  <div className={styles.rightCell} onClick={(e) => e.stopPropagation()}>
+                  <div className={styles.rightCell} data-col="date" onClick={(e) => e.stopPropagation()}>
                     <div className={styles.rightMeta}>
+                      {msg.hasAttachments && (
+                        <div
+                          className={styles.attachmentIndicator}
+                          aria-label={t("mail.hasAttachments")}
+                          title={t("mail.hasAttachments")}
+                        >
+                          <Paperclip className={styles.icon} aria-hidden="true" />
+                        </div>
+                      )}
                       <div className={styles.date} title={new Date(msg.receivedAt).toLocaleString()}>
                         {formatListArrivalTime(msg.receivedAt)}
                       </div>
-                      <div className={styles.rightMetaActions}>
-                        {msg.hasAttachments && (
-                          <div
-                            className={styles.attachmentIndicator}
-                            aria-label={t("mail.hasAttachments")}
-                            title={t("mail.hasAttachments")}
-                          >
-                            <Paperclip className={styles.icon} aria-hidden="true" />
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          className={`${styles.iconButton} ${styles.moreButton}`}
-                          aria-label={t("mail.moreActionsSubject", { subject: msg.subject })}
-                          title={t("mail.moreActions")}
-                          onClick={() => setRowActionsMessageId(msg.id)}
-                        >
-                          <MoreHorizontal className={styles.icon} aria-hidden="true" />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        className={`${styles.iconButton} ${styles.moreButton}`}
+                        aria-label={t("mail.moreActionsSubject", { subject: msg.subject })}
+                        title={t("mail.moreActions")}
+                        onClick={() => setRowActionsMessageId(msg.id)}
+                      >
+                        <MoreHorizontal className={styles.icon} aria-hidden="true" />
+                      </button>
                     </div>
                   </div>
                 </div>

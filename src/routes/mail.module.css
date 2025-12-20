@@ -1868,4 +1868,160 @@
   }
 }
 
+/* Desktop-only: Dense message list layout */
+@media (min-width: 1024px) {
+  .row {
+    min-height: 40px;
+  }
+
+  .rowDraggable {
+    margin: 0;
+    padding: 0;
+  }
+
+  .rowGrid {
+    display: grid;
+    grid-template-columns: 22px 240px 1fr 130px;
+    column-gap: 10px;
+    padding: 6px 10px;
+    align-items: center;
+    min-height: 40px;
+  }
+
+  .rowGrid > * {
+    min-width: 0;
+  }
+
+  .bimi {
+    width: 20px;
+    height: 20px;
+    font-size: 0.75rem;
+    grid-column: 1;
+  }
+
+  .from {
+    grid-column: 2;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 240px;
+    min-width: 0;
+  }
+
+  .summary {
+    grid-column: 3;
+    min-width: 0;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .summary > * {
+    min-width: 0;
+  }
+
+  .subject {
+    flex: 0 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .summarySep {
+    color: var(--light-text);
+    flex: 0 0 auto;
+    margin: 0 4px;
+  }
+
+  .preview {
+    color: var(--light-text);
+    font-weight: 400;
+    flex: 0 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rightCell {
+    grid-column: 4;
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    width: 130px;
+  }
+
+  .rightMeta {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .date {
+    font-size: 0.8rem;
+    color: var(--light-text);
+    white-space: nowrap;
+    text-align: right;
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .rightMetaActions {
+    display: none;
+  }
+
+  .attachmentIndicator {
+    flex: 0 0 auto;
+    display: inline-flex;
+    padding: 2px 4px;
+    font-size: 0.74rem;
+    align-items: center;
+  }
+
+  .attachmentIndicator .icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .moreButton {
+    flex: 0 0 auto;
+    opacity: 0;
+    pointer-events: none;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    min-width: 20px;
+    border-radius: 4px;
+  }
+
+  .moreButton .icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .rowGroupOpen .moreButton,
+  .row:hover .moreButton,
+  .row:focus .moreButton,
+  .row:focus-visible .moreButton {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* When more button is visible, hide date to save space */
+  .rowGroupOpen .date,
+  .row:hover .date,
+  .row:focus .date,
+  .row:focus-visible .date {
+    display: none;
+  }
+}
+
 

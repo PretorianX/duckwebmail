@@ -287,6 +287,49 @@ export function formatAddressList(value: JmapEmailAddress[] | undefined): string
     .join(", ");
 }
 
+/**
+ * Format sender for message list view: display name only (no email address).
+ * Rules:
+ * - Prefer parsed displayName when present
+ * - If only raw string exists, strip everything from the first < onward and trim
+ * - If result becomes empty, fallback to email local-part (before @)
+ * - Remove wrapping quotes
+ * - Never show angle brackets in list view
+ */
+export function formatSenderForList(value: JmapEmailAddress[] | undefined): string {
+  if (!value || value.length === 0) return "";
+  
+  // Take first sender only for list view
+  const first = value[0];
+  if (!first) return "";
+  
+  const name = (first.name ?? "").trim();
+  const email = (first.email ?? "").trim();
+  
+  // Prefer display name if present
+  if (name) {
+    // Remove quotes if present
+    let displayName = name.replace(/^["']|["']$/g, "");
+    // Strip anything after < if present
+    const angleIndex = displayName.indexOf("<");
+    if (angleIndex >= 0) {
+      displayName = displayName.substring(0, angleIndex).trim();
+    }
+    if (displayName) return displayName;
+  }
+  
+  // Fallback to email local-part (before @)
+  if (email) {
+    const atIndex = email.indexOf("@");
+    if (atIndex > 0) {
+      return email.substring(0, atIndex);
+    }
+    return email;
+  }
+  
+  return "";
+}
+
 export function isUnread(keywords: Record<string, boolean> | undefined): boolean {
   // JMAP: $seen means "read".
   return !(keywords && keywords["$seen"] === true);
