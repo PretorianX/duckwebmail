@@ -1,0 +1,66 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-build-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build (Vite)
+        run: npm run build
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (multi-stage)
+        run: |
+          set -euo pipefail
+          IMAGE_TAG="duckwebmail-ui:${GITHUB_SHA}"
+          docker build -t "${IMAGE_TAG}" .
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> "$GITHUB_ENV"
+
+      - name: Export image as OCI layout (directory)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends skopeo
+          mkdir -p artifacts
+          skopeo copy "docker-daemon:${IMAGE_TAG}" "oci:artifacts/duckwebmail-ui-oci:duckwebmail-ui"
+
+      - name: Upload OCI image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: duckwebmail-ui-oci-${{ github.sha }}
+          path: artifacts/duckwebmail-ui-oci
+          if-no-files-found: error
+
+

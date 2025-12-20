@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Add GitHub Actions CI to run lint/tests/build, build the multi-stage production Docker image, and publish a downloadable OCI image artifact (no Nginx; Node serves `dist/`).
 - Fix theme persistence to use namespaced localStorage key (`duckwebmail:theme`) instead of generic `theme` (prevents cross-app collisions and restores `VITE_DEFAULT_THEME=system` behavior).
 - Update login email placeholder to `e.g. duck@mail-duck.com` (avoid `example.com` copy).
 - Improve login UX: accessible error banner with safe, actionable error buckets (credentials / network / server) and remove test/dev/domain hints from UI.

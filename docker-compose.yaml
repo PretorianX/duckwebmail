@@ -2,7 +2,7 @@ services:
   webmail-ui:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
       - "8002:8002"
     environment:
