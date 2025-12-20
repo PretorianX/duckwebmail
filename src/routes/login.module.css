@@ -77,22 +77,8 @@
 .subtitle {
   margin: 12px 0 0;
   color: var(--light-text);
-  text-align: right;
+  text-align: center;
   font-style: italic;
-  padding-right: 10px;
-  border-right: 3px solid var(--duck-orange);
-}
-
-.subtitle q {
-  quotes: "“" "”" "‘" "’";
-}
-
-.subtitle q::before {
-  content: open-quote;
-}
-
-.subtitle q::after {
-  content: close-quote;
 }
 
 .form {

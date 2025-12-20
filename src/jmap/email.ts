@@ -118,7 +118,10 @@ const emailBodyCache = new Map<string, BodyCacheEntry>();
 /**
  * Build the JMAP filter object for Email/query.
  * - If no search query is provided, just filter by mailbox.
- * - If a search query is provided, use `text` for full-text search (most reliable).
+ * - If a search query is provided, search across from/to/subject/body.
+ * 
+ * Note: Stalwart may not support the `text` filter for FTS.
+ * Use OR conditions to search across multiple fields.
  */
 function buildEmailQueryFilter(mailboxId: string, query?: string, _includeBody?: boolean): Record<string, unknown> {
   const trimmedQuery = (query ?? "").trim();
@@ -126,12 +129,21 @@ function buildEmailQueryFilter(mailboxId: string, query?: string, _includeBody?:
     return { inMailbox: mailboxId };
   }
 
-  // Use `text` for FTS - searches headers and body
+  // Use OR conditions to search across multiple fields
+  // This is more compatible with Stalwart's current JMAP implementation
   return {
     operator: "AND",
     conditions: [
       { inMailbox: mailboxId },
-      { text: trimmedQuery }
+      {
+        operator: "OR",
+        conditions: [
+          { from: trimmedQuery },
+          { to: trimmedQuery },
+          { subject: trimmedQuery },
+          { body: trimmedQuery }
+        ]
+      }
     ]
   };
 }

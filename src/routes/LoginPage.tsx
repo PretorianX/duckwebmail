@@ -55,7 +55,7 @@ export default function LoginPage() {
               Inbox
             </button>
           ) : null}
-          <ProfileMenu />
+          {anyAuthedProfile ? <ProfileMenu /> : null}
           {isMobile ? null : <ThemeToggle />}
         </div>
       </header>
@@ -99,9 +99,7 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <blockquote className={styles.subtitle}>
-              <q>Pure Clean emails service for you, your family and business.</q>
-            </blockquote>
+            <p className={styles.subtitle}>Pure Clean emails service for you, your family and business.</p>
           </div>
         </div>
       </section>
