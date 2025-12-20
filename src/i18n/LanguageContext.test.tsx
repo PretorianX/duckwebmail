@@ -1,6 +1,5 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { vi } from "vitest";
 
 import { LanguageProvider, useLanguage } from "./LanguageContext";
 import { STORAGE_LANG } from "./i18n";
