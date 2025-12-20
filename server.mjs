@@ -79,15 +79,12 @@ const server = http.createServer(async (req, res) => {
     const body = await readFile(targetPath);
     res.statusCode = 200;
     res.end(body);
-  } catch (err) {
+  } catch {
     res.statusCode = 500;
     res.end("Internal Server Error");
   }
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  // eslint-disable-next-line no-console
-  console.log(`[webmail] serving ./dist on http://0.0.0.0:${PORT}`);
-});
+server.listen(PORT, "0.0.0.0");
 
 
