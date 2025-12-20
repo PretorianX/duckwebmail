@@ -27,6 +27,7 @@ import {
   Undo2,
   XCircle
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import styles from "./composeEditor.module.css";
 
@@ -115,6 +116,7 @@ function htmlOrEmpty(editorHtml: string, editorText: string) {
 }
 
 export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, placeholder = "Write your message…" }: Props) {
+  const { t } = useTranslation();
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const createdObjectUrlsRef = useRef<string[]>([]);
   const [picker, setPicker] = useState<Picker>(null);
@@ -139,6 +141,8 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
     []
   );
 
+  const placeholderText = placeholder ?? t("compose.editor.writeYourMessage");
+
   const extensions = useMemo(
     () => [
       StarterKit.configure({
@@ -158,10 +162,10 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
         allowBase64: false
       }),
       Placeholder.configure({
-        placeholder
+        placeholder: placeholderText
       })
     ],
-    [InlineImage, placeholder]
+    [InlineImage, placeholderText]
   );
 
   const editor = useEditor({
@@ -247,15 +251,15 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
   const canRedo = editor?.can().redo() ?? false;
 
   return (
-    <div className={styles.editorShell} aria-label="Rich text editor">
-      <div className={styles.toolbar} role="toolbar" aria-label="Formatting">
-        <div className={styles.toolbarGroup} aria-label="Fonts">
+    <div className={styles.editorShell} aria-label={t("compose.editor.richTextEditor")}>
+      <div className={styles.toolbar} role="toolbar" aria-label={t("compose.editor.formatting")}>
+        <div className={styles.toolbarGroup} aria-label={t("compose.editor.fonts")}>
           <button
             type="button"
             className={styles.pickerButton}
             aria-haspopup="dialog"
             aria-expanded={picker === "font"}
-            title="Font family"
+            title={t("compose.editor.fontFamily")}
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -275,7 +279,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
             className={styles.pickerButton}
             aria-haspopup="dialog"
             aria-expanded={picker === "size"}
-            title="Font size"
+            title={t("compose.editor.fontSize")}
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -293,12 +297,12 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
 
         <div className={styles.toolbarSpacer} aria-hidden="true" />
 
-        <div className={styles.toolbarGroup} aria-label="History">
+        <div className={styles.toolbarGroup} aria-label={t("compose.editor.history")}>
           <button
             type="button"
             className={styles.toolButton}
-            title="Undo"
-            aria-label="Undo"
+            title={t("compose.editor.undo")}
+            aria-label={t("compose.editor.undo")}
             disabled={!canUndo}
             onPointerDown={(e) => {
               // Keep this from focusing the editor on mobile.
@@ -317,8 +321,8 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
           <button
             type="button"
             className={styles.toolButton}
-            title="More"
-            aria-label="More formatting options"
+            title={t("compose.editor.more")}
+            aria-label={t("compose.editor.moreFormattingOptions")}
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -372,7 +376,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
           className={styles.sheetOverlay}
           role="dialog"
           aria-modal="true"
-          aria-label={picker === "font" ? "Choose font" : "Choose size"}
+          aria-label={t(picker === "font" ? "compose.editor.chooseFont" : picker === "size" ? "compose.editor.chooseSize" : "compose.editor.more")}
           onPointerDown={(e) => {
             // Prevent taps from reaching the toolbar/editor behind the sheet.
             e.preventDefault();
@@ -390,7 +394,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
           >
             <div className={styles.sheetHeader}>
               <div className={styles.sheetTitle}>
-                {picker === "font" ? "Font" : picker === "size" ? "Size" : "More"}
+                {t(picker === "font" ? "compose.editor.font" : picker === "size" ? "compose.editor.size" : "compose.editor.more")}
               </div>
             </div>
 
@@ -412,7 +416,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                       setPicker(null);
                     }}
                   >
-                    <span className={styles.sheetItemText}>Default</span>
+                    <span className={styles.sheetItemText}>{t("common.default")}</span>
                   </button>
                   {FONT_FAMILIES.map((f) => (
                     <button
@@ -452,7 +456,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                       setPicker(null);
                     }}
                   >
-                    <span className={styles.sheetItemText}>Default</span>
+                    <span className={styles.sheetItemText}>{t("common.default")}</span>
                   </button>
                   {FONT_SIZES.map((s) => (
                     <button
@@ -492,7 +496,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                   >
                     <span className={styles.sheetItemRow}>
                       <Bold className={styles.sheetItemIcon} aria-hidden="true" />
-                      <span className={styles.sheetItemText}>Bold</span>
+                      <span className={styles.sheetItemText}>{t("compose.editor.bold")}</span>
                     </span>
                   </button>
 
@@ -512,7 +516,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                   >
                     <span className={styles.sheetItemRow}>
                       <Italic className={styles.sheetItemIcon} aria-hidden="true" />
-                      <span className={styles.sheetItemText}>Italic</span>
+                      <span className={styles.sheetItemText}>{t("compose.editor.italic")}</span>
                     </span>
                   </button>
 
@@ -532,7 +536,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                   >
                     <span className={styles.sheetItemRow}>
                       <UnderlineIcon className={styles.sheetItemIcon} aria-hidden="true" />
-                      <span className={styles.sheetItemText}>Underline</span>
+                      <span className={styles.sheetItemText}>{t("compose.editor.underline")}</span>
                     </span>
                   </button>
 
@@ -552,7 +556,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                   >
                     <span className={styles.sheetItemRow}>
                       <Strikethrough className={styles.sheetItemIcon} aria-hidden="true" />
-                      <span className={styles.sheetItemText}>Strikethrough</span>
+                      <span className={styles.sheetItemText}>{t("compose.editor.strikethrough")}</span>
                     </span>
                   </button>
 
@@ -572,7 +576,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                   >
                     <span className={styles.sheetItemRow}>
                       <List className={styles.sheetItemIcon} aria-hidden="true" />
-                      <span className={styles.sheetItemText}>Bullet list</span>
+                      <span className={styles.sheetItemText}>{t("compose.editor.bulletList")}</span>
                     </span>
                   </button>
 
@@ -592,7 +596,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                   >
                     <span className={styles.sheetItemRow}>
                       <ListOrdered className={styles.sheetItemIcon} aria-hidden="true" />
-                      <span className={styles.sheetItemText}>Numbered list</span>
+                      <span className={styles.sheetItemText}>{t("compose.editor.numberedList")}</span>
                     </span>
                   </button>
 
@@ -612,7 +616,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                   >
                     <span className={styles.sheetItemRow}>
                       <Quote className={styles.sheetItemIcon} aria-hidden="true" />
-                      <span className={styles.sheetItemText}>Quote</span>
+                      <span className={styles.sheetItemText}>{t("compose.editor.quote")}</span>
                     </span>
                   </button>
 
@@ -628,7 +632,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                       e.stopPropagation();
                       if (!editor) return;
                       const prev = editor.getAttributes("link").href as string | undefined;
-                      const href = window.prompt("Enter link URL", prev ?? "");
+                      const href = window.prompt(t("compose.editor.enterLinkUrl"), prev ?? "");
                       if (!href) return;
                       editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
                       setPicker(null);
@@ -636,7 +640,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                   >
                     <span className={styles.sheetItemRow}>
                       <Link2 className={styles.sheetItemIcon} aria-hidden="true" />
-                      <span className={styles.sheetItemText}>Insert link</span>
+                      <span className={styles.sheetItemText}>{t("compose.editor.insertLink")}</span>
                     </span>
                   </button>
 
@@ -656,7 +660,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                   >
                     <span className={styles.sheetItemRow}>
                       <Link2Off className={styles.sheetItemIcon} aria-hidden="true" />
-                      <span className={styles.sheetItemText}>Remove link</span>
+                      <span className={styles.sheetItemText}>{t("compose.editor.removeLink")}</span>
                     </span>
                   </button>
 
@@ -676,7 +680,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                   >
                     <span className={styles.sheetItemRow}>
                       <ImagePlus className={styles.sheetItemIcon} aria-hidden="true" />
-                      <span className={styles.sheetItemText}>Insert image</span>
+                      <span className={styles.sheetItemText}>{t("compose.editor.insertImage")}</span>
                     </span>
                   </button>
 
@@ -697,7 +701,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                   >
                     <span className={styles.sheetItemRow}>
                       <Redo2 className={styles.sheetItemIcon} aria-hidden="true" />
-                      <span className={styles.sheetItemText}>Redo</span>
+                      <span className={styles.sheetItemText}>{t("compose.editor.redo")}</span>
                     </span>
                   </button>
 
@@ -717,7 +721,7 @@ export default function ComposeEditor({ valueHtml, onChangeHtml, onInlineImage, 
                   >
                     <span className={styles.sheetItemRow}>
                       <XCircle className={styles.sheetItemIcon} aria-hidden="true" />
-                      <span className={styles.sheetItemText}>Clear formatting</span>
+                      <span className={styles.sheetItemText}>{t("compose.editor.clearFormatting")}</span>
                     </span>
                   </button>
                 </>

@@ -23,6 +23,7 @@ import {
   Trash2,
   X
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import ProfileMenu from "../shared/ProfileMenu";
 import SafeEmailViewer from "../shared/SafeEmailViewer";
@@ -234,6 +235,7 @@ function decodeBasicUsername(authHeader: string): string | null {
 }
 
 export default function MailPage() {
+  const { t } = useTranslation();
   const { activeAuth: auth, activeProfile } = useAuth();
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const sendMenuRef = useRef<HTMLDivElement | null>(null);
@@ -545,29 +547,29 @@ export default function MailPage() {
     const trimmedName = folderOpName.trim();
     if (folderOpMode === "create" || folderOpMode === "rename") {
       if (trimmedName.length === 0) {
-        setFolderOpError("Folder name is required.");
+        setFolderOpError(t("mail.folderNameRequired"));
         return;
       }
       if (trimmedName.includes("/") || trimmedName.includes("\\")) {
-        setFolderOpError("Please use a folder name without slashes. Nesting is handled by parent folders.");
+        setFolderOpError(t("mail.folderNameNoSlashes"));
         return;
       }
     }
 
     if (folderOpMode === "rename" || folderOpMode === "delete") {
       if (!folderOpTargetId) {
-        setFolderOpError("No folder selected.");
+        setFolderOpError(t("mail.noFolderSelected"));
         return;
       }
       const role = (mailboxById.get(folderOpTargetId)?.role ?? "").trim();
       if (role.length > 0) {
-        setFolderOpError("This is a system folder and cannot be modified.");
+        setFolderOpError(t("mail.systemFolderCannotBeModified"));
         return;
       }
       if (folderOpMode === "delete") {
         const hasChildren = (folderIndex.childrenByParent.get(folderOpTargetId) ?? []).length > 0;
         if (hasChildren) {
-          setFolderOpError("This folder has subfolders. Delete (or move) subfolders first.");
+          setFolderOpError(t("mail.folderHasSubfolders"));
           return;
         }
       }
@@ -1557,7 +1559,7 @@ export default function MailPage() {
       triggerBlobDownload(filename, blob);
     } catch (e) {
       console.error("[EmlDownload] failed:", e);
-      globalThis.alert("Failed to download .eml. Please try again.");
+      globalThis.alert(t("mail.downloadEmlFailed"));
     }
   };
 
@@ -1570,10 +1572,10 @@ export default function MailPage() {
         </div>
         <div className={styles.headerSearch}>
           <label className={styles.searchLabel}>
-            <span className={styles.srOnly}>Search</span>
+            <span className={styles.srOnly}>{t("mail.search")}</span>
             <input
               className={styles.search}
-              placeholder="Search mail…"
+              placeholder={t("mail.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -1581,7 +1583,7 @@ export default function MailPage() {
           <button
             type="button"
             className={`${styles.searchBodyToggle} ${searchIncludeBody ? styles.searchBodyToggleActive : ""}`}
-            title={searchIncludeBody ? "Searching message text (click to disable)" : "Search message text"}
+            title={t(searchIncludeBody ? "mail.searchingMessageTextDisable" : "mail.searchMessageText")}
             onClick={() => setSearchIncludeBody((prev) => !prev)}
           >
             <FileText className={styles.icon} aria-hidden="true" />
@@ -1595,14 +1597,14 @@ export default function MailPage() {
               <button
                 type="button"
                 className={styles.headerEmail}
-                title="Click to copy email"
+                title={t("mail.clickToCopyEmail")}
                 onClick={() => {
                   void globalThis.navigator?.clipboard?.writeText(signedInEmail);
                   setEmailCopied(true);
                   setTimeout(() => setEmailCopied(false), 1500);
                 }}
               >
-                {emailCopied ? "Copied to clipboard" : signedInEmail}
+                {emailCopied ? t("mail.copiedToClipboard") : signedInEmail}
               </button>
             );
           })()}
@@ -1610,15 +1612,15 @@ export default function MailPage() {
         </div>
       </header>
 
-      <aside className={styles.sidebar} aria-label="Folders">
-        <nav className={styles.folders} aria-label="Folders">
+      <aside className={styles.sidebar} aria-label={t("mail.folders")}>
+        <nav className={styles.folders} aria-label={t("mail.folders")}>
           <div className={styles.folderFilterRow}>
             <label className={styles.folderFilterLabel}>
-              <span className={styles.srOnly}>Find folder</span>
+              <span className={styles.srOnly}>{t("mail.findFolder")}</span>
               <input
                 className={styles.folderFilter}
                 value={folderQuery}
-                placeholder="Find folder…"
+                placeholder={t("mail.findFolderPlaceholder")}
                 onChange={(e) => setFolderQuery(e.target.value)}
               />
             </label>
@@ -1627,7 +1629,7 @@ export default function MailPage() {
           <div
             className={styles.folderTree}
             role="tree"
-            aria-label="Folders"
+            aria-label={t("mail.folders")}
             onDragOver={(e) => {
               if (canDragFolders && draggingFolderId) {
                 e.preventDefault();
@@ -1658,17 +1660,17 @@ export default function MailPage() {
             {mailboxesLoading ? (
               <div className={styles.loadingState} aria-live="polite">
                 <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
-                Loading folders…
+                {t("mail.loadingFolders")}
               </div>
             ) : mailboxesError ? (
               <div className={styles.errorState} role="alert">
                 {mailboxesError}{" "}
                 <button type="button" className={styles.secondaryButton} onClick={() => void loadMailboxes({ force: true })}>
-                  Retry
+                  {t("common.retry")}
                 </button>
               </div>
             ) : folders.length === 0 ? (
-              <div className={styles.emptyState}>No folders.</div>
+              <div className={styles.emptyState}>{t("mail.noFolders")}</div>
             ) : (
               (folderIndex.childrenByParent.get(null) ?? [])
                 .filter((root) => (visibleFolderIds ? visibleFolderIds.has(root.id) : true))
@@ -1803,8 +1805,8 @@ export default function MailPage() {
                             <button
                               type="button"
                               className={`${styles.iconButton} ${styles.folderMoreButton}`}
-                              aria-label={`Folder actions ${f.name}`}
-                              title="Folder actions"
+                              aria-label={t("mail.folderActionsName", { name: f.name })}
+                              title={t("mail.folderActions")}
                               onClick={() => {
                                 setFolderPickerOpen(false);
                                 setFolderActionsFolderId(f.id);
@@ -1841,7 +1843,7 @@ export default function MailPage() {
             }}
           >
             <Pencil className={styles.icon} aria-hidden="true" />
-            <span>Compose</span>
+            <span>{t("mail.compose")}</span>
             {hasDraft && <span className={styles.sidebarDraftPill}>1</span>}
           </button>
         </div>
@@ -1856,7 +1858,7 @@ export default function MailPage() {
             aria-haspopup="dialog"
             aria-expanded={folderPickerOpen}
             aria-controls="folder-picker"
-            title="Change folder"
+            title={t("mail.changeFolder")}
           >
             <span className={styles.folderSwitcherDuck} aria-hidden="true">
               🦆
@@ -1873,23 +1875,25 @@ export default function MailPage() {
             listRef.current = el;
           }}
           className={styles.list}
-          aria-label="Message list"
+          aria-label={t("mail.messageList")}
         >
           {messagesLoading ? (
             <div className={styles.loadingState} aria-live="polite">
               <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
-              {searchQuery.trim() ? "Searching…" : "Loading emails…"}
+              {searchQuery.trim() ? t("mail.searching") : t("mail.loadingEmails")}
             </div>
           ) : messagesError ? (
             <div className={styles.errorState} role="alert">
               {messagesError}{" "}
               <button type="button" className={styles.secondaryButton} onClick={() => void loadMessages({ force: true })}>
-                Retry
+                {t("common.retry")}
               </button>
             </div>
           ) : messages.length === 0 ? (
             <div className={styles.emptyState}>
-              {searchQuery.trim() ? `No results for "${searchQuery.trim()}"` : "No emails in this folder."}
+              {searchQuery.trim()
+                ? t("mail.noResultsForQuery", { query: searchQuery.trim() })
+                : t("mail.noEmailsInFolder")}
             </div>
           ) : (
             messages.map((msg) => {
@@ -1910,7 +1914,7 @@ export default function MailPage() {
                 tabIndex={0}
                 aria-expanded={isOpen}
                 aria-controls={regionId}
-                aria-label={`Open ${msg.subject}`}
+                aria-label={t("mail.openMessage", { subject: msg.subject })}
                 draggable={canDragEmails}
                 onDragStart={(e) => {
                   if (!canDragEmails) return;
@@ -1950,8 +1954,8 @@ export default function MailPage() {
                         {msg.hasAttachments && (
                           <div
                             className={styles.attachmentIndicator}
-                            aria-label="Has attachments"
-                            title="Has attachments"
+                            aria-label={t("mail.hasAttachments")}
+                            title={t("mail.hasAttachments")}
                           >
                             <Paperclip className={styles.icon} aria-hidden="true" />
                           </div>
@@ -1959,8 +1963,8 @@ export default function MailPage() {
                         <button
                           type="button"
                           className={`${styles.iconButton} ${styles.moreButton}`}
-                          aria-label={`More actions ${msg.subject}`}
-                          title="More actions"
+                          aria-label={t("mail.moreActionsSubject", { subject: msg.subject })}
+                          title={t("mail.moreActions")}
                           onClick={() => setRowActionsMessageId(msg.id)}
                         >
                           <MoreHorizontal className={styles.icon} aria-hidden="true" />
@@ -1976,16 +1980,16 @@ export default function MailPage() {
                 data-testid={regionId}
                 className={`${styles.expanded} ${isOpen ? styles.expandedOpen : ""}`}
                 role="region"
-                aria-label={`Message ${msg.subject}`}
+                aria-label={t("mail.messageRegion", { subject: msg.subject })}
                 aria-hidden={!isOpen}
                 {...(!isOpen ? ({ inert: "" } as unknown as HTMLAttributes<HTMLDivElement>) : {})}
               >
                 <div className={styles.expandedMeta}>
                   <div>
-                    <span className={styles.metaLabel}>From:</span> {msg.from}
+                    <span className={styles.metaLabel}>{t("mail.from")}:</span> {msg.from}
                   </div>
                   <div>
-                    <span className={styles.metaLabel}>Received:</span> {new Date(msg.receivedAt).toLocaleString()}
+                    <span className={styles.metaLabel}>{t("mail.received")}:</span> {new Date(msg.receivedAt).toLocaleString()}
                   </div>
                 </div>
 
@@ -1993,7 +1997,7 @@ export default function MailPage() {
                   <button
                     type="button"
                     className={styles.toLineButton}
-                    title={expandedToIds.has(msg.id) ? "Hide full To header" : "Show full To header"}
+                    title={t(expandedToIds.has(msg.id) ? "mail.hideFullToHeader" : "mail.showFullToHeader")}
                     onClick={() =>
                       setExpandedToIds((prev) => {
                         const next = new Set(prev);
@@ -2003,21 +2007,21 @@ export default function MailPage() {
                       })
                     }
                   >
-                    <span className={styles.metaLabel}>To:</span> {expandedToIds.has(msg.id) ? msg.to : activeProfileName}
+                    <span className={styles.metaLabel}>{t("mail.to")}:</span> {expandedToIds.has(msg.id) ? msg.to : activeProfileName}
                   </button>
                   <div className={styles.downloadRow}>
                     {msg.attachments.length > 0 && (
                       <button
                         type="button"
                         className={styles.attachmentsToggle}
-                        aria-label={`Toggle attachments ${msg.subject}`}
+                        aria-label={t("mail.toggleAttachmentsSubject", { subject: msg.subject })}
                         aria-expanded={expandedAttachmentIds.has(msg.id)}
                         aria-controls={`attachments-${msg.id}`}
-                        title="Toggle attachments"
+                        title={t("mail.toggleAttachments")}
                         onClick={() => toggleAttachments(msg.id)}
                       >
                         <Paperclip className={styles.icon} aria-hidden="true" />
-                        <span className={styles.attachmentsToggleLabel}>Attachments</span>
+                        <span className={styles.attachmentsToggleLabel}>{t("mail.attachments")}</span>
                         <span className={styles.attachmentsToggleCount}>{msg.attachments.length}</span>
                         {expandedAttachmentIds.has(msg.id) ? (
                           <ChevronDown className={`${styles.icon} ${styles.attachmentsToggleChevron}`} aria-hidden="true" />
@@ -2033,7 +2037,7 @@ export default function MailPage() {
                   <div
                     id={`attachments-${msg.id}`}
                     className={styles.attachments}
-                    aria-label="Attachments"
+                    aria-label={t("mail.attachments")}
                     hidden={!expandedAttachmentIds.has(msg.id)}
                   >
                     {msg.attachments.map((a) => (
@@ -2041,8 +2045,8 @@ export default function MailPage() {
                         key={a.id}
                         type="button"
                         className={styles.attachmentChip}
-                        title="Download attachment"
-                        aria-label={`Download attachment ${a.name}`}
+                        title={t("mail.downloadAttachment")}
+                        aria-label={t("mail.downloadAttachmentName", { name: a.name })}
                         onClick={() => triggerDownload(a.name, a.contentType, a.content)}
                       >
                         <span className={styles.attachmentName}>{a.name}</span>
@@ -2058,7 +2062,7 @@ export default function MailPage() {
                 {bodyLoadingIds.has(msg.id) ? (
                   <div className={styles.bodyLoading} aria-live="polite">
                     <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
-                    Loading message…
+                    {t("mail.loadingMessage")}
                   </div>
                 ) : bodyErrors[msg.id] ? (
                   <div className={styles.errorState} role="alert">
@@ -2079,28 +2083,31 @@ export default function MailPage() {
         <footer className={styles.appFooter}>
           <div className={styles.footerQuota}>
             {quotaLoading ? (
-              <span className={styles.footerQuotaLoading}>Loading…</span>
+              <span className={styles.footerQuotaLoading}>{t("common.loading")}</span>
             ) : quotaError ? (
               <span className={styles.footerQuotaMuted} title={quotaError}>
-                Quota unavailable
+                {t("mail.quotaUnavailable")}
               </span>
             ) : (() => {
               if (quotas.length === 0) {
-                return <span className={styles.footerQuotaMuted}>Quota not configured</span>;
+                return <span className={styles.footerQuotaMuted}>{t("mail.quotaNotConfigured")}</span>;
               }
               const storageQuota = quotas.find((q) => q.resourceType === "octets");
               if (!storageQuota) {
                 const types = Array.from(new Set(quotas.map((q) => q.resourceType))).join(", ");
                 return (
-                  <span className={styles.footerQuotaMuted} title={`Available quota resourceTypes: ${types || "none"}`}>
-                    Storage quota unavailable
+                  <span
+                    className={styles.footerQuotaMuted}
+                    title={t("mail.availableQuotaResourceTypes", { types: types || t("common.none") })}
+                  >
+                    {t("mail.storageQuotaUnavailable")}
                   </span>
                 );
               }
-              const limitText = storageQuota.hardLimit ? formatQuotaBytes(storageQuota.hardLimit) : "unlimited";
+              const limitText = storageQuota.hardLimit ? formatQuotaBytes(storageQuota.hardLimit) : t("common.unlimited");
               return (
                 <span className={styles.footerQuotaItem}>
-                  Space used: {formatQuotaBytes(storageQuota.used)} / {limitText}
+                  {t("mail.spaceUsed", { used: formatQuotaBytes(storageQuota.used), limit: limitText })}
                 </span>
               );
             })()}
@@ -2116,14 +2123,14 @@ export default function MailPage() {
           className={styles.sheetOverlay}
           role="dialog"
           aria-modal="true"
-          aria-label="Message actions"
+          aria-label={t("mail.messageActions")}
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setRowActionsMessageId(null);
           }}
         >
           <div className={styles.sheet} role="document">
             <div className={styles.sheetHeader}>
-              <div className={styles.sheetTitle}>Actions</div>
+              <div className={styles.sheetTitle}>{t("mail.actions")}</div>
             </div>
             <div className={styles.sheetBody}>
               <button
@@ -2136,7 +2143,7 @@ export default function MailPage() {
               >
                 <span className={styles.sendMenuItemRow}>
                   <Reply className={styles.icon} aria-hidden="true" />
-                  Reply
+                  {t("mail.reply")}
                 </span>
               </button>
 
@@ -2154,7 +2161,7 @@ export default function MailPage() {
               >
                 <span className={styles.sendMenuItemRow}>
                   <Forward className={styles.icon} aria-hidden="true" />
-                  Forward
+                  {t("mail.forward")}
                 </span>
               </button>
 
@@ -2172,7 +2179,7 @@ export default function MailPage() {
                     aria-hidden="true"
                     fill={rowActionsMessage.starred ? "currentColor" : "none"}
                   />
-                  {rowActionsMessage.starred ? "Unstar" : "Star"}
+                  {rowActionsMessage.starred ? t("mail.unstar") : t("mail.star")}
                 </span>
               </button>
 
@@ -2190,14 +2197,14 @@ export default function MailPage() {
                   ) : (
                     <Mail className={styles.icon} aria-hidden="true" />
                   )}
-                  {rowActionsMessage.unread ? "Mark read" : "Mark unread"}
+                  {rowActionsMessage.unread ? t("mail.markRead") : t("mail.markUnread")}
                 </span>
               </button>
 
               <button
                 className={styles.sendMenuItem}
                 type="button"
-                title={!rowActionsMessage.blobId ? "Source unavailable" : "Download as .eml"}
+                title={!rowActionsMessage.blobId ? t("mail.sourceUnavailable") : t("mail.downloadAsEml")}
                 disabled={!auth || !rowActionsMessage.blobId}
                 onClick={() => {
                   void downloadEml(rowActionsMessage);
@@ -2206,7 +2213,7 @@ export default function MailPage() {
               >
                 <span className={styles.sendMenuItemRow}>
                   <FileDown className={styles.icon} aria-hidden="true" />
-                  Download source (.eml)
+                  {t("mail.downloadSourceEml")}
                 </span>
               </button>
 
@@ -2220,7 +2227,7 @@ export default function MailPage() {
               >
                 <span className={styles.sendMenuItemRow}>
                   <Trash2 className={styles.icon} aria-hidden="true" />
-                  Delete
+                  {t("common.delete")}
                 </span>
               </button>
             </div>
@@ -2233,14 +2240,14 @@ export default function MailPage() {
           className={styles.sheetOverlay}
           role="dialog"
           aria-modal="true"
-          aria-label="Folder actions"
+          aria-label={t("mail.folderActions")}
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setFolderActionsFolderId(null);
           }}
         >
           <div className={styles.sheet} role="document">
             <div className={styles.sheetHeader}>
-              <div className={styles.sheetTitle}>Actions</div>
+              <div className={styles.sheetTitle}>{t("mail.actions")}</div>
             </div>
             <div className={styles.sheetBody}>
               <div className={styles.listTitle} style={{ padding: "0 2px 6px" }}>
@@ -2258,7 +2265,7 @@ export default function MailPage() {
               >
                 <span className={styles.sendMenuItemRow}>
                   <Plus className={styles.icon} aria-hidden="true" />
-                  New subfolder
+                  {t("mail.newSubfolder")}
                 </span>
               </button>
 
@@ -2266,7 +2273,7 @@ export default function MailPage() {
                 className={styles.sendMenuItem}
                 type="button"
                 disabled={folderActionsIsSystemFolder}
-                title={folderActionsIsSystemFolder ? "System folder cannot be renamed" : "Rename folder"}
+                title={t(folderActionsIsSystemFolder ? "mail.systemFolderCannotBeRenamed" : "mail.renameFolder")}
                 onClick={() => {
                   const id = folderActionsFolderId;
                   setFolderActionsFolderId(null);
@@ -2275,7 +2282,7 @@ export default function MailPage() {
               >
                 <span className={styles.sendMenuItemRow}>
                   <Pencil className={styles.icon} aria-hidden="true" />
-                  Rename
+                  {t("mail.rename")}
                 </span>
               </button>
 
@@ -2285,10 +2292,10 @@ export default function MailPage() {
                 disabled={folderActionsIsSystemFolder || folderActionsHasChildren}
                 title={
                   folderActionsIsSystemFolder
-                    ? "System folder cannot be deleted"
+                    ? t("mail.systemFolderCannotBeDeleted")
                     : folderActionsHasChildren
-                      ? "Delete subfolders first"
-                      : "Delete folder"
+                      ? t("mail.deleteSubfoldersFirst")
+                      : t("mail.deleteFolder")
                 }
                 onClick={() => {
                   const id = folderActionsFolderId;
@@ -2298,7 +2305,7 @@ export default function MailPage() {
               >
                 <span className={styles.sendMenuItemRow}>
                   <Trash2 className={styles.icon} aria-hidden="true" />
-                  Delete
+                  {t("common.delete")}
                 </span>
               </button>
 
@@ -2306,7 +2313,7 @@ export default function MailPage() {
                 className={styles.sendMenuItem}
                 type="button"
                 disabled={folderActionsIsSystemFolder}
-                title={folderActionsIsSystemFolder ? "System folder cannot be moved" : "Move to root"}
+                title={t(folderActionsIsSystemFolder ? "mail.systemFolderCannotBeMoved" : "mail.moveToRoot")}
                 onClick={() => {
                   const id = folderActionsFolderId;
                   setFolderActionsFolderId(null);
@@ -2315,7 +2322,7 @@ export default function MailPage() {
               >
                 <span className={styles.sendMenuItemRow}>
                   <ChevronDown className={styles.icon} aria-hidden="true" />
-                  Move to root
+                  {t("mail.moveToRoot")}
                 </span>
               </button>
 
@@ -2329,7 +2336,7 @@ export default function MailPage() {
               >
                 <span className={styles.sendMenuItemRow}>
                   <Plus className={styles.icon} aria-hidden="true" />
-                  New folder (root)
+                  {t("mail.newFolderRoot")}
                 </span>
               </button>
             </div>
@@ -2341,16 +2348,16 @@ export default function MailPage() {
         <button
           type="button"
           className={styles.composeDock}
-          aria-label={composeMinimized ? "Resume draft" : "Compose"}
-          title={composeMinimized ? "Resume draft" : "Compose"}
+          aria-label={t(composeMinimized ? "mail.resumeDraft" : "mail.compose")}
+          title={t(composeMinimized ? "mail.resumeDraft" : "mail.compose")}
           onClick={() => {
             if (composeMinimized) resumeCompose();
             else beginCompose({ to: "", subject: "", body: "" });
           }}
         >
           <Pencil className={`${styles.icon} ${styles.composeDockIcon}`} aria-hidden="true" />
-          <span className={styles.composeDockLabel}>{composeMinimized ? "Resume" : "Compose"}</span>
-          {composeMinimized && <span className={styles.composeDockDraftPill}>Draft: 1</span>}
+          <span className={styles.composeDockLabel}>{t(composeMinimized ? "mail.resume" : "mail.compose")}</span>
+          {composeMinimized && <span className={styles.composeDockDraftPill}>{t("mail.draftCount", { count: 1 })}</span>}
         </button>
       )}
 
@@ -2360,24 +2367,24 @@ export default function MailPage() {
           className={styles.sheetOverlay}
           role="dialog"
           aria-modal="true"
-          aria-label="Choose folder"
+          aria-label={t("mail.chooseFolder")}
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setFolderPickerOpen(false);
           }}
         >
           <div className={styles.sheet} role="document">
             <div className={styles.sheetHeader}>
-              <div className={styles.sheetTitle}>Folders</div>
+              <div className={styles.sheetTitle}>{t("mail.folders")}</div>
             </div>
 
             <div className={styles.sheetBody}>
               <div className={styles.folderFilterRow}>
                 <label className={styles.folderFilterLabel}>
-                  <span className={styles.srOnly}>Find folder</span>
+                  <span className={styles.srOnly}>{t("mail.findFolder")}</span>
                   <input
                     className={styles.folderFilter}
                     value={folderQuery}
-                    placeholder="Find folder…"
+                    placeholder={t("mail.findFolderPlaceholder")}
                     onChange={(e) => setFolderQuery(e.target.value)}
                   />
                 </label>
@@ -2386,7 +2393,7 @@ export default function MailPage() {
               <div
                 className={styles.folderTree}
                 role="tree"
-                aria-label="Folders"
+                aria-label={t("mail.folders")}
                 onDragOver={(e) => {
                   if (canDragFolders && draggingFolderId) {
                     e.preventDefault();
@@ -2417,17 +2424,17 @@ export default function MailPage() {
                 {mailboxesLoading ? (
                   <div className={styles.loadingState} aria-live="polite">
                     <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
-                    Loading folders…
+                    {t("mail.loadingFolders")}
                   </div>
                 ) : mailboxesError ? (
                   <div className={styles.errorState} role="alert">
                     {mailboxesError}{" "}
                     <button type="button" className={styles.secondaryButton} onClick={() => void loadMailboxes({ force: true })}>
-                      Retry
+                      {t("common.retry")}
                     </button>
                   </div>
                 ) : folders.length === 0 ? (
-                  <div className={styles.emptyState}>No folders.</div>
+                  <div className={styles.emptyState}>{t("mail.noFolders")}</div>
                 ) : (
                   (folderIndex.childrenByParent.get(null) ?? [])
                     .filter((root) => (visibleFolderIds ? visibleFolderIds.has(root.id) : true))
@@ -2599,14 +2606,14 @@ export default function MailPage() {
           className={styles.modalOverlay}
           role="dialog"
           aria-modal="true"
-          aria-label="Compose email"
+          aria-label={t("mail.composeEmail")}
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) minimizeCompose();
           }}
         >
           <div className={styles.modal} role="document">
             <div className={styles.modalHeader}>
-              <div className={styles.modalTitle}>New email</div>
+              <div className={styles.modalTitle}>{t("mail.newEmail")}</div>
             </div>
 
             <div className={styles.modalBody}>
@@ -2617,9 +2624,9 @@ export default function MailPage() {
               )}
               <div className={styles.field}>
                 <div className={styles.fieldHeaderRow}>
-                  <div className={styles.fieldLabel}>From</div>
+                  <div className={styles.fieldLabel}>{t("mail.from")}</div>
                   {isDesktop && activeProfileName.trim() !== "" && (
-                    <div className={styles.fieldHint} title="Profile">
+                    <div className={styles.fieldHint} title={t("profile.profile")}>
                       {activeProfileName}
                     </div>
                   )}
@@ -2627,7 +2634,7 @@ export default function MailPage() {
                 <input
                   className={styles.input}
                   type="email"
-                  placeholder="sender@example.com"
+                  placeholder={t("mail.senderPlaceholder")}
                   value={composeDraft.from}
                   disabled={composeBusy}
                   onChange={(e) => setComposeDraft((prev) => ({ ...prev, from: e.target.value }))}
@@ -2636,14 +2643,14 @@ export default function MailPage() {
 
               <div className={styles.field}>
                 <div className={styles.fieldHeaderRow}>
-                  <div className={styles.fieldLabel}>To</div>
+                  <div className={styles.fieldLabel}>{t("mail.to")}</div>
                   {isDesktop && (
                     <div className={styles.fieldActions}>
                       <button
                         type="button"
                         className={styles.miniToggle}
                         aria-pressed={composeShowCc}
-                        title="Add CC"
+                        title={t("mail.addCc")}
                         onClick={() => setComposeShowCc((v) => !v)}
                         disabled={composeBusy}
                       >
@@ -2653,7 +2660,7 @@ export default function MailPage() {
                         type="button"
                         className={styles.miniToggle}
                         aria-pressed={composeShowBcc}
-                        title="Add BCC"
+                        title={t("mail.addBcc")}
                         onClick={() => setComposeShowBcc((v) => !v)}
                         disabled={composeBusy}
                       >
@@ -2665,7 +2672,7 @@ export default function MailPage() {
                 <input
                   className={styles.input}
                   type="email"
-                  placeholder="recipient@example.com"
+                  placeholder={t("mail.recipientPlaceholder")}
                   value={composeDraft.to}
                   disabled={composeBusy}
                   onChange={(e) => setComposeDraft((prev) => ({ ...prev, to: e.target.value }))}
@@ -2678,7 +2685,7 @@ export default function MailPage() {
                   <input
                     className={styles.input}
                     type="email"
-                    placeholder="cc@example.com"
+                    placeholder={t("mail.ccPlaceholder")}
                     value={composeDraft.cc}
                     disabled={composeBusy}
                     onChange={(e) => setComposeDraft((prev) => ({ ...prev, cc: e.target.value }))}
@@ -2692,7 +2699,7 @@ export default function MailPage() {
                   <input
                     className={styles.input}
                     type="email"
-                    placeholder="bcc@example.com"
+                    placeholder={t("mail.bccPlaceholder")}
                     value={composeDraft.bcc}
                     disabled={composeBusy}
                     onChange={(e) => setComposeDraft((prev) => ({ ...prev, bcc: e.target.value }))}
@@ -2700,11 +2707,11 @@ export default function MailPage() {
                 </label>
               )}
               <label className={styles.field}>
-                Subject
+                {t("mail.subject")}
                 <input
                   className={styles.input}
                   type="text"
-                  placeholder="Subject"
+                  placeholder={t("mail.subjectPlaceholder")}
                   value={composeDraft.subject}
                   disabled={composeBusy}
                   onChange={(e) => setComposeDraft((prev) => ({ ...prev, subject: e.target.value }))}
@@ -2713,7 +2720,7 @@ export default function MailPage() {
 
               {scheduleEnabled && (
                 <label className={styles.field}>
-                  Scheduled for
+                  {t("mail.scheduledFor")}
                   <input
                     ref={scheduledForInputRef}
                     className={`${styles.input} ${styles.datetimeInput}`}
@@ -2725,12 +2732,12 @@ export default function MailPage() {
                 </label>
               )}
               <div className={styles.field}>
-                <div className={styles.fieldLabel}>Message</div>
+                <div className={styles.fieldLabel}>{t("mail.message")}</div>
                 <ComposeEditor
                   valueHtml={composeDraft.body}
                   onChangeHtml={(next) => setComposeDraft((prev) => ({ ...prev, body: next }))}
                   onInlineImage={({ cid, file }) => setInlineImagesByCid((prev) => ({ ...prev, [cid]: file }))}
-                  placeholder="Write your message… (paste / drop images inline)"
+                  placeholder={t("mail.writeMessagePlaceholderLong")}
                 />
               </div>
 
@@ -2748,8 +2755,8 @@ export default function MailPage() {
               />
 
               {attachments.length > 0 && (
-                <div className={styles.attachmentsSection} aria-label="Attachments">
-                  <div className={styles.attachmentsHeader}>Attachments</div>
+                <div className={styles.attachmentsSection} aria-label={t("mail.attachments")}>
+                  <div className={styles.attachmentsHeader}>{t("mail.attachments")}</div>
                   <div className={styles.attachmentChips}>
                     {attachments.map((f, idx) => (
                       <div key={`${f.name}-${f.size}-${idx}`} className={styles.attachmentChipCompose}>
@@ -2760,8 +2767,8 @@ export default function MailPage() {
                         <button
                           type="button"
                           className={styles.attachmentRemove}
-                          aria-label={`Remove ${f.name}`}
-                          title="Remove"
+                          aria-label={t("common.removeName", { name: f.name })}
+                          title={t("common.remove")}
                           onClick={() => setAttachments((prev) => prev.filter((_, i) => i !== idx))}
                         >
                           <X className={styles.icon} aria-hidden="true" />
@@ -2784,13 +2791,13 @@ export default function MailPage() {
                     else discardCompose();
                   }}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   className={styles.secondaryButton}
                   type="button"
-                  title="Attach file"
-                  aria-label="Attach file"
+                  title={t("mail.attachFile")}
+                  aria-label={t("mail.attachFile")}
                   disabled={composeBusy}
                   onClick={() => attachmentsInputRef.current?.click()}
                 >
@@ -2806,15 +2813,15 @@ export default function MailPage() {
                     disabled={composeBusy}
                     onClick={() => void sendComposeToServer()}
                   >
-                    {composeBusy ? "Sending…" : scheduleEnabled ? "Schedule send" : "Send"}
+                    {composeBusy ? t("mail.sending") : scheduleEnabled ? t("mail.scheduleSend") : t("mail.send")}
                   </button>
                   <button
                     className={styles.splitToggle}
                     type="button"
                     aria-haspopup="menu"
                     aria-expanded={sendMenuOpen}
-                    aria-label="More send options"
-                    title="More send options"
+                    aria-label={t("mail.moreSendOptions")}
+                    title={t("mail.moreSendOptions")}
                     disabled={composeBusy}
                     onClick={() => setSendMenuOpen((v) => !v)}
                   >
@@ -2822,7 +2829,7 @@ export default function MailPage() {
                   </button>
 
                   {sendMenuOpen && (
-                    <div className={styles.sendMenu} role="menu" aria-label="Send options">
+                    <div className={styles.sendMenu} role="menu" aria-label={t("mail.sendOptions")}>
                       <button
                         className={styles.sendMenuItem}
                         type="button"
@@ -2840,7 +2847,7 @@ export default function MailPage() {
                       >
                         <span className={styles.sendMenuItemRow}>
                           <Save className={styles.icon} aria-hidden="true" />
-                          {composeBusy ? "Saving…" : "Save as draft"}
+                          {composeBusy ? t("mail.saving") : t("mail.saveAsDraft")}
                         </span>
                       </button>
                       {scheduleEnabled && (
@@ -2894,7 +2901,7 @@ export default function MailPage() {
                         >
                           <span className={styles.sendMenuItemRow}>
                             <Clock className={styles.icon} aria-hidden="true" />
-                            Schedule delivery
+                            {t("mail.scheduleDelivery")}
                           </span>
                         </button>
                       )}
@@ -2912,14 +2919,14 @@ export default function MailPage() {
           className={styles.confirmOverlay}
           role="dialog"
           aria-modal="true"
-          aria-label="Save draft"
+          aria-label={t("mail.saveDraft")}
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setComposeCancelConfirmOpen(false);
           }}
         >
           <div className={styles.confirmModal} role="document">
-            <div className={styles.confirmTitle}>Save draft?</div>
-            <div className={styles.confirmBody}>You have changes in this email. Save it as a draft?</div>
+            <div className={styles.confirmTitle}>{t("mail.saveDraftPrompt")}</div>
+            <div className={styles.confirmBody}>{t("mail.saveDraftBody")}</div>
             <div className={styles.confirmActions}>
               <button
                 type="button"
@@ -2929,14 +2936,14 @@ export default function MailPage() {
                   discardCompose();
                 }}
               >
-                Discard
+                {t("common.discard")}
               </button>
               <button
                 type="button"
                 className={styles.secondaryButton}
                 onClick={() => setComposeCancelConfirmOpen(false)}
               >
-                Continue editing
+                {t("common.continueEditing")}
               </button>
               <button
                 type="button"
@@ -2951,7 +2958,7 @@ export default function MailPage() {
                   void run();
                 }}
               >
-                Save draft
+                {t("mail.saveDraft")}
               </button>
             </div>
           </div>
@@ -2964,7 +2971,11 @@ export default function MailPage() {
           role="dialog"
           aria-modal="true"
           aria-label={
-            folderOpMode === "create" ? "Create folder" : folderOpMode === "rename" ? "Rename folder" : "Delete folder"
+            folderOpMode === "create"
+              ? t("mail.createFolder")
+              : folderOpMode === "rename"
+                ? t("mail.renameFolder")
+                : t("mail.deleteFolder")
           }
           onMouseDown={(e) => {
             if (folderOpBusy) return;
@@ -2973,7 +2984,11 @@ export default function MailPage() {
         >
           <div className={styles.folderOpModal} role="document">
             <div className={styles.confirmTitle}>
-              {folderOpMode === "create" ? "New folder" : folderOpMode === "rename" ? "Rename folder" : "Delete folder"}
+              {folderOpMode === "create"
+                ? t("mail.newFolder")
+                : folderOpMode === "rename"
+                  ? t("mail.renameFolder")
+                  : t("mail.deleteFolder")}
             </div>
 
             {folderOpError && (
@@ -2984,20 +2999,22 @@ export default function MailPage() {
 
             {folderOpMode === "delete" ? (
               <div className={styles.confirmBody}>
-                Delete <strong>{folderIndex.byId.get(folderOpTargetId ?? "")?.name ?? "this folder"}</strong>? This can’t be undone.
+                {t("mail.delete")}{" "}
+                <strong>{folderIndex.byId.get(folderOpTargetId ?? "")?.name ?? t("mail.thisFolder")}</strong>
+                {t("mail.deleteFolderConfirmSuffix")}
               </div>
             ) : (
               <div className={styles.folderOpForm}>
                 {folderOpMode === "create" && (
                   <label className={styles.folderOpField}>
-                    <span className={styles.folderOpLabel}>Parent</span>
+                    <span className={styles.folderOpLabel}>{t("mail.parent")}</span>
                     <select
                       className={styles.input}
                       value={folderOpParentId ?? ""}
                       onChange={(e) => setFolderOpParentId(e.target.value === "" ? null : e.target.value)}
                       disabled={folderOpBusy}
                     >
-                      <option value="">(Root)</option>
+                      <option value="">{t("mail.root")}</option>
                       {folderOptions.map((o) => (
                         <option key={o.id} value={o.id}>
                           {`${"— ".repeat(o.depth)}${o.label}`}
@@ -3008,13 +3025,13 @@ export default function MailPage() {
                 )}
 
                 <label className={styles.folderOpField}>
-                  <span className={styles.folderOpLabel}>Name</span>
+                  <span className={styles.folderOpLabel}>{t("common.name")}</span>
                   <input
                     className={styles.input}
                     type="text"
                     value={folderOpName}
                     onChange={(e) => setFolderOpName(e.target.value)}
-                    placeholder={folderOpMode === "create" ? "e.g. Receipts" : undefined}
+                    placeholder={folderOpMode === "create" ? t("mail.folderNameExample") : undefined}
                     autoFocus
                     disabled={folderOpBusy}
                     onKeyDown={(e) => {
@@ -3027,7 +3044,7 @@ export default function MailPage() {
 
             <div className={styles.confirmActions}>
               <button type="button" className={styles.secondaryButton} onClick={() => closeFolderOp()} disabled={folderOpBusy}>
-                Cancel
+                {t("common.cancel")}
               </button>
               {folderOpMode === "delete" ? (
                 <button
@@ -3036,11 +3053,17 @@ export default function MailPage() {
                   onClick={() => void submitFolderOp()}
                   disabled={folderOpBusy}
                 >
-                  {folderOpBusy ? "Deleting…" : "Delete"}
+                  {folderOpBusy ? t("mail.deleting") : t("common.delete")}
                 </button>
               ) : (
                 <button type="button" className={styles.primaryButton} onClick={() => void submitFolderOp()} disabled={folderOpBusy}>
-                  {folderOpMode === "create" ? (folderOpBusy ? "Creating…" : "Create") : folderOpBusy ? "Saving…" : "Save"}
+                  {folderOpMode === "create"
+                    ? folderOpBusy
+                      ? t("mail.creating")
+                      : t("mail.create")
+                    : folderOpBusy
+                      ? t("mail.saving")
+                      : t("common.save")}
                 </button>
               )}
             </div>

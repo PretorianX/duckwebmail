@@ -1,15 +1,17 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { AuthProvider, RequireAuth, useAuth } from "./auth/AuthContext";
 import LoginPage from "./routes/LoginPage";
 import MailPage from "./routes/MailPage";
 
 function HomeRedirect() {
+  const { t } = useTranslation();
   const { activeAuth, rehydrating } = useAuth();
   if (rehydrating) {
     return (
       <div style={{ padding: 16, color: "var(--text-color)" }} aria-live="polite">
-        Restoring session…
+        {t("app.restoringSession")}
       </div>
     );
   }

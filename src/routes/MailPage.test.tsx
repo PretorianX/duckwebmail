@@ -5,6 +5,7 @@ import { vi } from "vitest";
 
 import MailPage from "./MailPage";
 import { ThemeProvider } from "../theme/ThemeContext";
+import { LanguageProvider } from "../i18n/LanguageContext";
 
 vi.mock("../auth/AuthContext", () => {
   const activeAuth = {
@@ -134,7 +135,9 @@ function renderMailPage() {
   return render(
     <MemoryRouter initialEntries={["/mail"]}>
       <ThemeProvider>
-        <MailPage />
+        <LanguageProvider>
+          <MailPage />
+        </LanguageProvider>
       </ThemeProvider>
     </MemoryRouter>
   );

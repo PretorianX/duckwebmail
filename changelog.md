@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Add UI localization (i18n) with language switcher and browser auto-detect; supports English, Spanish, Ukrainian, and Russian; persist preference under `duckwebmail:lang`.
 - Add `docker-compose.prod.yml` for production (nginx + certbot + Stalwart + DuckWebmail UI) with hardened defaults, healthchecks, and Let’s Encrypt volumes/webroot wiring.
 - Expand production operations docs: initial cert issuance, host-driven renew + reload, and backup guidance for Stalwart data + Let’s Encrypt state.
 - Add GitHub Actions CI to run lint/tests/build, build the multi-stage production Docker image, publish it to GHCR (GitHub Packages), and upload a downloadable OCI image artifact (no Nginx; Node serves `dist/`).
