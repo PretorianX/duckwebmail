@@ -19,7 +19,8 @@ export function useTheme(): ThemeContextValue {
   return ctx;
 }
 
-const STORAGE_THEME = "theme";
+// Namespaced key to avoid collisions with other apps (many sites use plain "theme").
+const STORAGE_THEME = "duckwebmail:theme";
 const STORAGE_SCHEME = "duckwebmail:themeScheme";
 
 function envDefaultTheme(): Theme | "system" | null {
