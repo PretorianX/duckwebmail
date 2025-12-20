@@ -93,10 +93,10 @@
 }
 
 .folders {
-  padding: 8px 8px 10px;
+  padding: 4px 6px 6px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   flex: 1 1 auto;
   overflow: auto;
 }
@@ -176,13 +176,17 @@
 .folderRight {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex: 0 0 auto;
 }
 
 .folderMoreButton {
   opacity: 0;
   pointer-events: none;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
 }
 
 @media (hover: none), (pointer: coarse) {
@@ -250,19 +254,19 @@
 .folderTree {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
 }
 
 .folderNode {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
 }
 
 .folderChildren {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
 }
 
 .folderItem {
@@ -271,35 +275,46 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
   border: 1px solid transparent;
   background: transparent;
   color: inherit;
-  padding: 9px 10px;
-  border-radius: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
   cursor: pointer;
+  min-height: 28px;
+  max-height: 32px;
+  line-height: 1.25;
+  transition: background-color 120ms ease, border-color 120ms ease;
 }
 
 .folderItem:hover {
-  background: rgba(255, 204, 0, 0.08);
-  border-color: rgba(255, 204, 0, 0.25);
+  background: rgba(255, 204, 0, 0.05);
+  border-color: rgba(255, 204, 0, 0.2);
 }
 
 .folderItemActive {
-  background: rgba(255, 204, 0, 0.16);
-  border-color: rgba(255, 204, 0, 0.35);
+  background: rgba(255, 204, 0, 0.12);
+  border-color: rgba(255, 204, 0, 0.3);
+}
+
+.folderItemActive .folderLabel {
+  font-weight: 500;
 }
 
 .folderLabel {
-  font-weight: 600;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 1.25;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
+  color: var(--text-color);
 }
 
 .folderLabelUnread {
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .folderLabelParent {
@@ -311,49 +326,67 @@
 }
 
 .folderLabelParentOpen .folderToggle {
-  background: rgba(255, 204, 0, 0.12);
+  background: rgba(255, 204, 0, 0.1);
   color: var(--text-color);
 }
 
 .folderToggle {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 4px;
   color: var(--light-text);
   flex: 0 0 auto;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .folderToggle:hover {
-  background: rgba(255, 204, 0, 0.08);
+  background: rgba(255, 204, 0, 0.06);
   color: var(--text-color);
 }
 
 .folderBranchIcon {
   width: 14px;
   height: 14px;
-  opacity: 0.55;
+  opacity: 0.5;
   color: var(--light-text);
   flex: 0 0 auto;
 }
 
+.folderItem .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.folderToggle .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.folderMoreButton .icon {
+  width: 14px;
+  height: 14px;
+}
+
 .folderTogglePlaceholder {
-  opacity: 0.55;
-  width: 12px;
-  height: 12px;
+  opacity: 0.4;
+  width: 14px;
+  height: 14px;
 }
 
 .folderToggleSpacer {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   display: block;
 }
 
 .folderDuck {
-  opacity: 0.9;
+  opacity: 0.85;
   flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .folderNameText {
@@ -361,18 +394,21 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 13px;
+  line-height: 1.25;
 }
 
 .unreadPill {
-  min-width: 22px;
-  height: 20px;
-  padding: 0 8px;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.78rem;
-  font-weight: 900;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
   background: var(--accent-color);
   color: #121620;
 }
@@ -1561,30 +1597,7 @@
 }
 
 @media screen and (min-width: 1024px) {
-  .folders {
-    padding: 6px 6px 8px;
-    gap: 4px;
-  }
-
-  .folderTree {
-    gap: 2px;
-  }
-
-  .folderChildren {
-    gap: 2px;
-  }
-
-  .folderItem {
-    padding-top: 4px;
-    padding-bottom: 4px;
-    padding-left: 8px;
-    padding-right: 8px;
-    margin-bottom: 2px;
-  }
-
-  .folderLabel {
-    font-weight: 500;
-  }
+  /* Folder list is already optimized for desktop in base styles */
 
   .list {
     padding: 6px 10px;
@@ -1632,6 +1645,27 @@
 
   .desktopSearchRow {
     display: none;
+  }
+
+  /* Restore larger folder text size on mobile */
+  .folderLabel {
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+
+  .folderNameText {
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+
+  .sheetFolderItem .folderLabel {
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+
+  .sheetFolderItem .folderNameText {
+    font-size: 0.95rem;
+    line-height: 1.4;
   }
 
   .mobileTopbar {

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Redesign folder list (left sidebar) for desktop: achieve 2×+ vertical density with compact 28-32px row height, reduced padding (4px 8px), optimized typography (13px font, 1.25 line-height), smaller icons (14px), and subtle hover/active states. Removed excessive gaps and spacing while maintaining clarity and fast scanning.
 - Add `duck2` ("Duck 2.0") color scheme: deep navy dark palette with soft orange accents, plus `.light-theme` body class support for automatic light/dark switching.
 - Add Settings and About pages; Settings includes theme mode/scheme, language, and time zone selection (persisted locally).
 - Remove language selection from the profile menu (moved to Settings).
