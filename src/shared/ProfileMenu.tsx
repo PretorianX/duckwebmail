@@ -3,8 +3,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 import { Check, Info, LogIn, LogOut, Settings, ShieldCheck, User, Users } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../auth/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
+import type { SupportedLanguage } from "../i18n/i18n";
 
 const Wrapper = styled.div`
   position: relative;
@@ -146,7 +149,15 @@ const RightIcon = styled.span`
   }
 `;
 
+const LANGUAGE_OPTIONS: Array<{ code: SupportedLanguage; label: string }> = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Español" },
+  { code: "uk", label: "Українська" },
+  { code: "ru", label: "Русский" }
+];
+
 export default function ProfileMenu() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const menuId = useId();
@@ -157,6 +168,7 @@ export default function ProfileMenu() {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   const { profiles, activeProfileId, activeProfile, setActiveProfileId, authByProfile, signOut } = useAuth();
+  const { language, setLanguage } = useLanguage();
 
   useEffect(() => {
     if (!open) return;
@@ -185,8 +197,8 @@ export default function ProfileMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? popoverId : undefined}
-        aria-label={`Profile menu (${activeProfile.name})`}
-        title={`Profile: ${activeProfile.name}`}
+        aria-label={t("profile.menuLabel", { name: activeProfile.name })}
+        title={t("profile.profileTitle", { name: activeProfile.name })}
         onClick={() => setOpen((v) => !v)}
       >
         <User size={20} aria-hidden="true" />
@@ -196,18 +208,18 @@ export default function ProfileMenu() {
         <Popover id={popoverId} role="menu" aria-labelledby={buttonId}>
           <PopoverHeader>
             <ActiveProfile>
-              <ActiveLabel>Profile</ActiveLabel>
+              <ActiveLabel>{t("profile.profile")}</ActiveLabel>
               <ActiveName>
                 {activeProfile.name} <span aria-hidden="true">🦆</span>
               </ActiveName>
             </ActiveProfile>
           </PopoverHeader>
 
-          <Section aria-label="Actions">
+          <Section aria-label={t("profile.actions")}>
             <MenuItem
               type="button"
               role="menuitem"
-              title="Settings"
+              title={t("profile.settings")}
               onClick={() => {
                 setOpen(false);
                 // Placeholder for future settings screen/dialog.
@@ -217,14 +229,14 @@ export default function ProfileMenu() {
                 <Icon>
                   <Settings aria-hidden="true" />
                 </Icon>
-                <ItemText>Settings</ItemText>
+                <ItemText>{t("profile.settings")}</ItemText>
               </ItemLeft>
             </MenuItem>
 
             <MenuItem
               type="button"
               role="menuitem"
-              title="About Duckwebmail"
+              title={t("profile.aboutDuckwebmail")}
               onClick={() => {
                 setOpen(false);
                 // Placeholder for future about screen/dialog.
@@ -234,14 +246,47 @@ export default function ProfileMenu() {
                 <Icon>
                   <Info aria-hidden="true" />
                 </Icon>
-                <ItemText>About</ItemText>
+                <ItemText>{t("profile.about")}</ItemText>
               </ItemLeft>
             </MenuItem>
           </Section>
 
           <Divider />
 
-          <Section aria-label="Profiles">
+          <Section aria-label={t("app.language")}>
+            {LANGUAGE_OPTIONS.map((opt) => {
+              const active = opt.code === language;
+              return (
+                <MenuItem
+                  key={opt.code}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={active}
+                  title={active ? opt.label : `Switch to ${opt.label}`}
+                  onClick={() => {
+                    setLanguage(opt.code);
+                    setOpen(false);
+                  }}
+                >
+                  <ItemLeft>
+                    <Icon>
+                      <User aria-hidden="true" />
+                    </Icon>
+                    <ItemText>{opt.label}</ItemText>
+                  </ItemLeft>
+                  {active && (
+                    <RightIcon>
+                      <Check aria-hidden="true" />
+                    </RightIcon>
+                  )}
+                </MenuItem>
+              );
+            })}
+          </Section>
+
+          <Divider />
+
+          <Section aria-label={t("profile.profiles")}>
             {profiles.map((p) => {
               const active = p.id === activeProfileId;
               const authed = !!authByProfile[p.id];
@@ -254,11 +299,11 @@ export default function ProfileMenu() {
                   title={
                     active
                       ? authed
-                        ? "Active (signed in)"
-                        : "Active (not signed in)"
+                        ? t("profile.activeSignedIn")
+                        : t("profile.activeNotSignedIn")
                       : authed
-                        ? "Switch to profile"
-                        : "Switch and sign in"
+                        ? t("profile.switchToProfile")
+                        : t("profile.switchAndSignIn")
                   }
                   onClick={() => {
                     setActiveProfileId(p.id);
@@ -288,7 +333,7 @@ export default function ProfileMenu() {
 
           <Divider />
 
-          <Section aria-label="Sign in/out">
+          <Section aria-label={t("profile.signInOut")}>
             {profiles.map((p) => {
               const authed = !!authByProfile[p.id];
               const isActive = p.id === activeProfileId;
@@ -297,7 +342,7 @@ export default function ProfileMenu() {
                   key={`${p.id}-auth`}
                   type="button"
                   role="menuitem"
-                  title={authed ? `Sign out ${p.name}` : `Sign in ${p.name}`}
+                  title={authed ? t("profile.signOutName", { name: p.name }) : t("profile.signInName", { name: p.name })}
                   onClick={() => {
                     setOpen(false);
                     if (!isActive) setActiveProfileId(p.id);
@@ -312,12 +357,12 @@ export default function ProfileMenu() {
                   <ItemLeft>
                     <Icon>{authed ? <LogOut aria-hidden="true" /> : <LogIn aria-hidden="true" />}</Icon>
                     <ItemText>
-                      {authed ? `Sign out ${p.name}` : `Sign in ${p.name}`}{" "}
+                      {authed ? t("profile.signOutName", { name: p.name }) : t("profile.signInName", { name: p.name })}{" "}
                       {authed && <span style={{ fontWeight: 800, color: "var(--duck-orange)" }}>•</span>}
                     </ItemText>
                   </ItemLeft>
                   {authed && (
-                    <RightIcon title="Signed in">
+                    <RightIcon title={t("profile.signedIn")}>
                       <ShieldCheck aria-hidden="true" />
                     </RightIcon>
                   )}

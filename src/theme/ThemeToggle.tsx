@@ -1,6 +1,7 @@
 import styled from "styled-components";
 
 import { Moon, Sun } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { useTheme } from "./ThemeContext";
 
@@ -23,14 +24,15 @@ const ToggleButton = styled.button`
 `;
 
 export default function ThemeToggle() {
+  const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const currentTheme = theme ?? "light";
 
   return (
     <ToggleButton
       onClick={toggleTheme}
-      aria-label={`Switch to ${currentTheme === "light" ? "dark" : "light"} mode`}
-      title={`Switch to ${currentTheme === "light" ? "dark" : "light"} mode`}
+      aria-label={t(currentTheme === "light" ? "theme.switchToDarkMode" : "theme.switchToLightMode")}
+      title={t(currentTheme === "light" ? "theme.switchToDarkMode" : "theme.switchToLightMode")}
     >
       {currentTheme === "light" ? <Moon size={20} aria-hidden="true" /> : <Sun size={20} aria-hidden="true" />}
     </ToggleButton>

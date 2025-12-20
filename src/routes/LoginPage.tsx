@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { isAuthError, useAuth } from "../auth/AuthContext";
 import ThemeToggle from "../theme/ThemeToggle";
@@ -8,31 +9,32 @@ import ProfileMenu from "../shared/ProfileMenu";
 import { useMediaQuery } from "../shared/useMediaQuery";
 import styles from "./login.module.css";
 
-function toUserFacingLoginError(err: unknown): { message: string; focusPassword: boolean } {
+function toUserFacingLoginError(err: unknown, t: (key: string, options?: Record<string, unknown>) => string): { message: string; focusPassword: boolean } {
   if (isAuthError(err)) {
     switch (err.kind) {
       case "invalid_credentials":
-        return { message: "Couldn’t sign in. Check your email/username and password.", focusPassword: true };
+        return { message: t("login.errors.invalidCredentials"), focusPassword: true };
       case "network":
-        return { message: "Couldn’t reach the server. Check your connection and try again.", focusPassword: false };
+        return { message: t("login.errors.network"), focusPassword: false };
       case "server":
-        return { message: "The server returned an error while signing in. Try again in a moment.", focusPassword: false };
+        return { message: t("login.errors.server"), focusPassword: false };
       case "unexpected":
       default:
-        return { message: "Couldn’t sign in. Please try again.", focusPassword: false };
+        return { message: t("login.errors.unexpected"), focusPassword: false };
     }
   }
-  return { message: "Couldn’t sign in. Please try again.", focusPassword: false };
+  return { message: t("login.errors.unexpected"), focusPassword: false };
 }
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { signIn, activeProfile, activeAuth, profiles, authByProfile, setActiveProfileId } = useAuth();
   const isMobile = useMediaQuery("(max-width: 880px)");
   const branding = (import.meta.env.VITE_LOGIN_BRANDING as string | undefined)?.trim();
-  const brandingText = branding ? branding : "Pure Email";
+  const brandingText = branding ? branding : t("login.brandingDefault");
   const tagline = (import.meta.env.VITE_LOGIN_TAGLINE as string | undefined)?.trim();
-  const taglineText = tagline ? tagline : "A lightweight webmail client for JMAP servers.";
+  const taglineText = tagline ? tagline : t("login.taglineDefault");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export default function LoginPage() {
       await signIn(email.trim(), password);
       navigate("/mail");
     } catch (err) {
-      const mapped = toUserFacingLoginError(err);
+      const mapped = toUserFacingLoginError(err, t);
       setError(mapped.message);
       if (mapped.focusPassword) {
         void Promise.resolve().then(() => {
@@ -83,13 +85,13 @@ export default function LoginPage() {
             <button
               type="button"
               className={styles.backToInbox}
-              title="Back to inbox"
+              title={t("login.backToInbox")}
               onClick={() => {
                 if (!activeAuth && anyAuthedProfile) setActiveProfileId(anyAuthedProfile.id);
                 navigate("/mail");
               }}
             >
-              Inbox
+              {t("common.inbox")}
             </button>
           ) : null}
           {anyAuthedProfile ? <ProfileMenu /> : null}
@@ -102,7 +104,9 @@ export default function LoginPage() {
           <div className={styles.branding}>{brandingText}</div>
 
           <div className={styles.card}>
-            <h1 className={styles.title}>{activeAuth ? `Sign in (${activeProfile.name})` : "Sign in"}</h1>
+            <h1 className={styles.title}>
+              {activeAuth ? t("login.signInWithProfile", { name: activeProfile.name }) : t("login.signIn")}
+            </h1>
 
             <form className={styles.form} onSubmit={handleSubmit} aria-busy={loading}>
               {error && (
@@ -113,7 +117,7 @@ export default function LoginPage() {
 
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="login-email">
-                  Email / Username
+                  {t("login.emailUsername")}
                 </label>
                 <input
                   ref={emailRef}
@@ -123,14 +127,14 @@ export default function LoginPage() {
                   name="email"
                   autoComplete="username"
                   inputMode="email"
-                  placeholder="e.g. duck@mail-duck.com"
+                  placeholder={t("login.emailPlaceholder")}
                   required
                 />
               </div>
 
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="login-password">
-                  Password
+                  {t("login.password")}
                 </label>
                 <div className={styles.passwordRow}>
                   <input
@@ -147,7 +151,7 @@ export default function LoginPage() {
                     className={styles.passwordToggle}
                     onClick={() => setShowPassword((p) => !p)}
                     aria-controls="login-password"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={t(showPassword ? "login.hidePassword" : "login.showPassword")}
                     disabled={loading}
                   >
                     {showPassword ? <EyeOff aria-hidden="true" className={styles.passwordIcon} /> : <Eye aria-hidden="true" className={styles.passwordIcon} />}
@@ -156,7 +160,7 @@ export default function LoginPage() {
               </div>
 
               <button className={styles.primaryButton} type="submit" disabled={loading}>
-                {loading ? "Signing in…" : "Continue"}
+                {loading ? t("login.signingIn") : t("common.continue")}
               </button>
             </form>
 

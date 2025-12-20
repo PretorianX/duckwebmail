@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import DOMPurify from "dompurify";
 import styled, { keyframes } from "styled-components";
+import { useTranslation } from "react-i18next";
 
 const spin = keyframes`
   from { transform: rotate(0deg); }
@@ -73,6 +74,7 @@ export default function SafeEmailViewer({
   textContent: string;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -128,7 +130,7 @@ export default function SafeEmailViewer({
         )}
         <iframe
           ref={iframeRef}
-          title="Email content"
+          title={t("mail.emailContent")}
           sandbox="allow-same-origin allow-popups"
           srcDoc={srcDoc}
           onLoad={handleLoad}
@@ -139,7 +141,7 @@ export default function SafeEmailViewer({
 
   return (
     <EmailContainer className={className}>
-      <div className="plain-text">{textContent || "No content available for this email."}</div>
+      <div className="plain-text">{textContent || t("mail.noContentAvailable")}</div>
     </EmailContainer>
   );
 }
