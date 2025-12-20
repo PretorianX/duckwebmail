@@ -1,0 +1,85 @@
+.page {
+  min-height: 100vh;
+  padding: 16px;
+  background: var(--background-color);
+  color: var(--text-color);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 12px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.headerActions {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.backButton {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 2px solid var(--duck-orange);
+  background: transparent;
+  color: var(--duck-orange);
+  font-weight: 900;
+}
+
+.backButton:hover {
+  background-color: rgba(247, 148, 29, 0.12);
+}
+
+.center {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 6px 0 20px;
+}
+
+.stack {
+  width: 100%;
+  max-width: 720px;
+  display: grid;
+  gap: 10px;
+}
+
+.card {
+  width: 100%;
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 10px var(--shadow-color);
+  text-align: left;
+}
+
+.title {
+  margin: 0 0 10px;
+  font-size: 1.5rem;
+}
+
+.text {
+  margin: 0;
+  color: var(--light-text);
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--light-text);
+  display: grid;
+  gap: 6px;
+}
+
+.list li {
+  line-height: 1.35;
+}
+
+

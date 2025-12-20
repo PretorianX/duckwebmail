@@ -4,9 +4,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { DEFAULT_THEME_SCHEME, isThemeSchemeId, type ThemeSchemeId } from "./schemes";
 
 type Theme = "light" | "dark";
+type ThemePreference = Theme | "system";
 type ThemeContextValue = {
   theme: Theme;
   toggleTheme: () => void;
+  themePreference: ThemePreference;
+  setThemePreference: (pref: ThemePreference) => void;
   scheme: ThemeSchemeId;
   setScheme: (scheme: ThemeSchemeId) => void;
 };
@@ -38,22 +41,18 @@ function getSystemTheme(): Theme {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-function shouldFollowSystemTheme(): boolean {
-  // If the user has already chosen a theme, do not override it.
-  const saved = localStorage.getItem(STORAGE_THEME);
-  if (saved === "dark" || saved === "light") return false;
-
-  // Otherwise use the deployment default.
-  return envDefaultTheme() === "system";
+function isThemePreference(value: unknown): value is ThemePreference {
+  return value === "light" || value === "dark" || value === "system";
 }
 
-function getInitialTheme(): Theme {
+function getInitialThemePreference(): ThemePreference {
   const saved = localStorage.getItem(STORAGE_THEME);
-  if (saved === "dark" || saved === "light") return saved;
+  if (isThemePreference(saved)) return saved;
+
   const env = envDefaultTheme();
-  if (env === "dark" || env === "light") return env;
-  if (env === "system") return getSystemTheme();
-  return getSystemTheme();
+  if (env === "light" || env === "dark" || env === "system") return env;
+
+  return "system";
 }
 
 function getInitialScheme(): ThemeSchemeId {
@@ -70,10 +69,9 @@ function getInitialScheme(): ThemeSchemeId {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [manualTheme, setManualTheme] = useState<Theme>(() => getInitialTheme());
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => getInitialThemePreference());
   const [systemTheme, setSystemTheme] = useState<Theme>(() => getSystemTheme());
   const [scheme, _setScheme] = useState<ThemeSchemeId>(() => getInitialScheme());
-  const [followSystemTheme, setFollowSystemTheme] = useState<boolean>(() => shouldFollowSystemTheme());
 
   // Do not auto-write defaults into localStorage.
   // We only persist when the user explicitly changes theme/scheme (later: Settings UI).
@@ -89,16 +87,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  // Until Settings exist, ALL devices follow VITE_DEFAULT_THEME.
-  // If it is set to "system", we track OS theme changes.
-  const theme: Theme = followSystemTheme ? systemTheme : manualTheme;
+  const theme: Theme = themePreference === "system" ? systemTheme : themePreference;
 
   const toggleTheme = useCallback(() => {
-    // Until Settings exist, we still allow manual switching via the toggle
-    // (desktop-only UI in most places), and persist that explicit choice.
     shouldPersistThemeRef.current = true;
-    setFollowSystemTheme(false);
-    setManualTheme((prev) => (prev === "light" ? "dark" : "light"));
+    setThemePreferenceState((prev) => {
+      const current: Theme = prev === "system" ? (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light") : prev;
+      return current === "light" ? "dark" : "light";
+    });
+  }, []);
+
+  const setThemePreference = useCallback((pref: ThemePreference) => {
+    shouldPersistThemeRef.current = true;
+    setThemePreferenceState(pref);
   }, []);
 
   const setScheme = useCallback((next: ThemeSchemeId) => {
@@ -116,15 +117,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!shouldPersistThemeRef.current) return;
-    localStorage.setItem(STORAGE_THEME, manualTheme);
-  }, [manualTheme]);
+    localStorage.setItem(STORAGE_THEME, themePreference);
+  }, [themePreference]);
 
   useEffect(() => {
     if (!shouldPersistSchemeRef.current) return;
     localStorage.setItem(STORAGE_SCHEME, scheme);
   }, [scheme]);
 
-  const value = useMemo(() => ({ theme, toggleTheme, scheme, setScheme }), [theme, toggleTheme, scheme, setScheme]);
+  const value = useMemo(
+    () => ({ theme, toggleTheme, themePreference, setThemePreference, scheme, setScheme }),
+    [theme, toggleTheme, themePreference, setThemePreference, scheme, setScheme]
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

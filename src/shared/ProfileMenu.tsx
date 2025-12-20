@@ -6,8 +6,6 @@ import { Check, Info, LogIn, LogOut, Settings, ShieldCheck, User, Users } from "
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../auth/AuthContext";
-import { useLanguage } from "../i18n/LanguageContext";
-import type { SupportedLanguage } from "../i18n/i18n";
 
 const Wrapper = styled.div`
   position: relative;
@@ -149,13 +147,6 @@ const RightIcon = styled.span`
   }
 `;
 
-const LANGUAGE_OPTIONS: Array<{ code: SupportedLanguage; label: string }> = [
-  { code: "en", label: "English" },
-  { code: "es", label: "Español" },
-  { code: "uk", label: "Українська" },
-  { code: "ru", label: "Русский" }
-];
-
 export default function ProfileMenu() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -168,7 +159,6 @@ export default function ProfileMenu() {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   const { profiles, activeProfileId, activeProfile, setActiveProfileId, authByProfile, signOut } = useAuth();
-  const { language, setLanguage } = useLanguage();
 
   useEffect(() => {
     if (!open) return;
@@ -222,7 +212,7 @@ export default function ProfileMenu() {
               title={t("profile.settings")}
               onClick={() => {
                 setOpen(false);
-                // Placeholder for future settings screen/dialog.
+                if (location.pathname !== "/settings") navigate("/settings");
               }}
             >
               <ItemLeft>
@@ -239,7 +229,7 @@ export default function ProfileMenu() {
               title={t("profile.aboutDuckwebmail")}
               onClick={() => {
                 setOpen(false);
-                // Placeholder for future about screen/dialog.
+                if (location.pathname !== "/about") navigate("/about");
               }}
             >
               <ItemLeft>
@@ -249,39 +239,6 @@ export default function ProfileMenu() {
                 <ItemText>{t("profile.about")}</ItemText>
               </ItemLeft>
             </MenuItem>
-          </Section>
-
-          <Divider />
-
-          <Section aria-label={t("app.language")}>
-            {LANGUAGE_OPTIONS.map((opt) => {
-              const active = opt.code === language;
-              return (
-                <MenuItem
-                  key={opt.code}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={active}
-                  title={active ? opt.label : `Switch to ${opt.label}`}
-                  onClick={() => {
-                    setLanguage(opt.code);
-                    setOpen(false);
-                  }}
-                >
-                  <ItemLeft>
-                    <Icon>
-                      <User aria-hidden="true" />
-                    </Icon>
-                    <ItemText>{opt.label}</ItemText>
-                  </ItemLeft>
-                  {active && (
-                    <RightIcon>
-                      <Check aria-hidden="true" />
-                    </RightIcon>
-                  )}
-                </MenuItem>
-              );
-            })}
           </Section>
 
           <Divider />

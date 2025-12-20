@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 
 import { AuthProvider, RequireAuth, useAuth } from "./auth/AuthContext";
 import LoginPage from "./routes/LoginPage";
+import AboutPage from "./routes/AboutPage";
 import MailPage from "./routes/MailPage";
+import SettingsPage from "./routes/SettingsPage";
 
 function HomeRedirect() {
   const { t } = useTranslation();
@@ -24,6 +26,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route
           path="/mail"
           element={

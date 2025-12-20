@@ -4,13 +4,17 @@ import userEvent from "@testing-library/user-event";
 import { ThemeProvider, useTheme } from "./ThemeContext";
 
 function ThemeProbe() {
-  const { theme, scheme, toggleTheme } = useTheme();
+  const { theme, scheme, themePreference, toggleTheme, setThemePreference } = useTheme();
   return (
     <div>
       <div data-testid="theme">{theme}</div>
       <div data-testid="scheme">{scheme}</div>
+      <div data-testid="themePref">{themePreference}</div>
       <button type="button" onClick={toggleTheme}>
         toggle
+      </button>
+      <button type="button" onClick={() => setThemePreference("system")}>
+        set-system
       </button>
     </div>
   );
@@ -42,10 +46,28 @@ describe("ThemeProvider storage keys", () => {
       </ThemeProvider>
     );
 
+    expect(screen.getByTestId("themePref")).toHaveTextContent(/^(system|light|dark)$/);
+
     await user.click(screen.getByRole("button", { name: /toggle/i }));
 
     expect(localStorage.getItem("duckwebmail:theme")).toBe("dark");
     expect(localStorage.getItem("theme")).toBeNull();
+  });
+
+  test("allows selecting system theme explicitly", async () => {
+    localStorage.clear();
+    localStorage.setItem("duckwebmail:theme", "dark");
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+
+    render(
+      <ThemeProvider>
+        <ThemeProbe />
+      </ThemeProvider>
+    );
+
+    await user.click(screen.getByRole("button", { name: /set-system/i }));
+    expect(localStorage.getItem("duckwebmail:theme")).toBe("system");
+    expect(screen.getByTestId("themePref")).toHaveTextContent("system");
   });
 });
 

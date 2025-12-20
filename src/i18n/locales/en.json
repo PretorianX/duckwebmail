@@ -206,6 +206,30 @@
     "switchAndSignIn": "Switch and sign in",
     "switchToProfile": "Switch to profile"
   }
+  ,
+  "settings": {
+    "title": "Settings",
+    "back": "Back to inbox",
+    "themeMode": "Theme",
+    "themeModeSystem": "System",
+    "themeModeLight": "Light",
+    "themeModeDark": "Dark",
+    "themeModeHint": "System follows your device appearance setting.",
+    "themeScheme": "Color scheme",
+    "language": "Language",
+    "timezone": "Time zone",
+    "timezoneHint": "Used for displaying dates and scheduling."
+  },
+  "about": {
+    "title": "About DuckWebmail",
+    "back": "Back to inbox",
+    "description": "DuckWebmail is a lightweight webmail client for JMAP servers.",
+    "bullets": {
+      "jmap": "Built for JMAP (fast sync, modern mail).",
+      "localFirst": "Preferences are stored locally in your browser.",
+      "privacy": "No third-party analytics by default."
+    }
+  }
 }
 
 
