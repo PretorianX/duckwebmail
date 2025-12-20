@@ -123,11 +123,14 @@ const emailBodyCache = new Map<string, BodyCacheEntry>();
  * Note: Stalwart may not support the `text` filter for FTS.
  * Use OR conditions to search across multiple fields.
  */
-function buildEmailQueryFilter(mailboxId: string, query?: string, _includeBody?: boolean): Record<string, unknown> {
+function buildEmailQueryFilter(mailboxId: string, query?: string, includeBody?: boolean): Record<string, unknown> {
   const trimmedQuery = (query ?? "").trim();
   if (trimmedQuery === "") {
     return { inMailbox: mailboxId };
   }
+
+  const queryConditions: Array<Record<string, unknown>> = [{ from: trimmedQuery }, { to: trimmedQuery }, { subject: trimmedQuery }];
+  if (includeBody) queryConditions.push({ body: trimmedQuery });
 
   // Use OR conditions to search across multiple fields
   // This is more compatible with Stalwart's current JMAP implementation
@@ -137,12 +140,7 @@ function buildEmailQueryFilter(mailboxId: string, query?: string, _includeBody?:
       { inMailbox: mailboxId },
       {
         operator: "OR",
-        conditions: [
-          { from: trimmedQuery },
-          { to: trimmedQuery },
-          { subject: trimmedQuery },
-          { body: trimmedQuery }
-        ]
+        conditions: queryConditions
       }
     ]
   };

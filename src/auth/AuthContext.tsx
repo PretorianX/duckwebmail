@@ -17,6 +17,26 @@ export interface AuthState {
   accountId: string;
 }
 
+export type AuthErrorKind = "invalid_credentials" | "network" | "server" | "unexpected";
+
+export class AuthError extends Error {
+  readonly kind: AuthErrorKind;
+  readonly status?: number;
+  readonly cause?: unknown;
+
+  constructor(message: string, opts: { kind: AuthErrorKind; status?: number; cause?: unknown }) {
+    super(message);
+    this.name = "AuthError";
+    this.kind = opts.kind;
+    this.status = opts.status;
+    this.cause = opts.cause;
+  }
+}
+
+export function isAuthError(err: unknown): err is AuthError {
+  return err instanceof AuthError;
+}
+
 interface AuthContextValue {
   profiles: Profile[];
   activeProfileId: string;
@@ -61,32 +81,43 @@ function writeStoredAuthHeaders(next: StoredAuthHeaders): void {
 async function fetchJmapSession(authHeader: string): Promise<{ session: JmapSession; accountId: string }> {
   // Stalwart redirects `/.well-known/jmap` -> `/jmap/session` (307).
   // Some clients can mishandle auth headers across redirects, so request `/jmap/session` directly.
-  const response = await fetch("/jmap/session", {
-    headers: { Authorization: authHeader }
-  });
+  let response: Response;
+  try {
+    response = await fetch("/jmap/session", {
+      headers: { Authorization: authHeader }
+    });
+  } catch (err) {
+    throw new AuthError("Network error while contacting the server", { kind: "network", cause: err });
+  }
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("Unauthorized");
+      throw new AuthError("Invalid credentials", { kind: "invalid_credentials", status: 401 });
     }
-    throw new Error(`Authentication failed: ${response.status} ${response.statusText}`);
+    if (response.status >= 500) {
+      throw new AuthError("Server error while authenticating", { kind: "server", status: response.status });
+    }
+    throw new AuthError(`Authentication failed: ${response.status} ${response.statusText}`, {
+      kind: "unexpected",
+      status: response.status
+    });
   }
 
   const rawSession = (await response.json()) as JmapSession;
   const session = normalizeSession(rawSession);
 
   if (!session.apiUrl) {
-    throw new Error("Invalid JMAP session: missing apiUrl");
+    throw new AuthError("Invalid JMAP session: missing apiUrl", { kind: "unexpected" });
   }
 
   // If we got a public (unauthenticated) session, Stalwart returns no accounts.
   if (!session.accounts || Object.keys(session.accounts).length === 0) {
-    throw new Error("Authenticated session contains no accounts");
+    throw new AuthError("Authenticated session contains no accounts", { kind: "unexpected" });
   }
 
   const accountId = getPrimaryMailAccountId(session);
   if (!accountId) {
-    throw new Error("No mail account found in JMAP session");
+    throw new AuthError("No mail account found in JMAP session", { kind: "unexpected" });
   }
 
   return { session, accountId };
@@ -164,20 +195,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Use the identifier as entered (some Stalwart setups authenticate by full email address).
     const identifier = email.trim();
     const authHeader = "Basic " + btoa(`${identifier}:${password}`);
-    try {
-      const { session, accountId } = await fetchJmapSession(authHeader);
-      setAuthByProfile((prev) => ({ ...prev, [profileId]: { authHeader, session, accountId } }));
-      const stored = readStoredAuthHeaders();
-      writeStoredAuthHeaders({ ...stored, [profileId]: { authHeader } });
-      if (profileId !== activeProfileId) setActiveProfileId(profileId);
-    } catch (err) {
-      if (err instanceof Error && err.message === "Unauthorized") {
-        throw new Error(
-          'Invalid username/email or password. For local Stalwart dev, use a non-admin mailbox user (see `stalwart/etc/config.toml` / `docker-compose.yaml`).'
-        );
-      }
-      throw err;
-    }
+    const { session, accountId } = await fetchJmapSession(authHeader);
+    setAuthByProfile((prev) => ({ ...prev, [profileId]: { authHeader, session, accountId } }));
+    const stored = readStoredAuthHeaders();
+    writeStoredAuthHeaders({ ...stored, [profileId]: { authHeader } });
+    if (profileId !== activeProfileId) setActiveProfileId(profileId);
   };
 
   const signOut = (opts?: { profileId?: string }) => {

@@ -260,7 +260,7 @@ export default function MailPage() {
   const [folderOpError, setFolderOpError] = useState<string | null>(null);
   const [folderOpName, setFolderOpName] = useState("");
   const [folderOpParentId, setFolderOpParentId] = useState<string | null>(null);
-  const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
+  const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(() => new Set());
   const [expandedAttachmentIds, setExpandedAttachmentIds] = useState<Set<string>>(() => new Set());
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeMinimized, setComposeMinimized] = useState(false);
@@ -686,7 +686,7 @@ export default function MailPage() {
 
   useEffect(() => {
     // Switching folder should never keep old expanded state around.
-    setExpandedMessageId(null);
+    setExpandedMessageIds(new Set());
     setExpandedAttachmentIds(new Set());
     setExpandedToIds(new Set());
     setDraggingEmailId(null);
@@ -708,7 +708,7 @@ export default function MailPage() {
     const delta = afterTop - pending.top;
     if (Math.abs(delta) >= 1) listEl.scrollTop += delta;
     pendingScrollAnchorRef.current = null;
-  }, [expandedMessageId]);
+  }, [expandedMessageIds]);
 
   const performMoveEmail = async (params: { emailId: string; fromFolderId: string; toFolderId: string }) => {
     if (!auth) return;
@@ -727,7 +727,12 @@ export default function MailPage() {
       if (folderIdRef.current === params.fromFolderId) {
         setMessages((prev) => prev.filter((m) => m.id !== params.emailId));
         setMessagesTotal((prev) => (typeof prev === "number" ? Math.max(0, prev - 1) : prev));
-        setExpandedMessageId((prev) => (prev === params.emailId ? null : prev));
+        setExpandedMessageIds((prev) => {
+          if (!prev.has(params.emailId)) return prev;
+          const next = new Set(prev);
+          next.delete(params.emailId);
+          return next;
+        });
         setExpandedAttachmentIds((prev) => {
           const next = new Set(prev);
           next.delete(params.emailId);
@@ -1270,28 +1275,17 @@ export default function MailPage() {
     const anchorEl = rowGroupRefs.current.get(messageId) ?? null;
     if (anchorEl) pendingScrollAnchorRef.current = { messageId, top: anchorEl.getBoundingClientRect().top };
 
-    const prevExpandedId = expandedMessageId;
-    const nextExpandedId = prevExpandedId === messageId ? null : messageId;
+    const wasOpen = expandedMessageIds.has(messageId);
+    setExpandedMessageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) next.delete(messageId);
+      else next.add(messageId);
+      return next;
+    });
 
-    // If we're switching messages, collapse the previously open one.
-    if (prevExpandedId && prevExpandedId !== nextExpandedId) {
-      setExpandedAttachmentIds((prev) => {
-        const next = new Set(prev);
-        next.delete(prevExpandedId);
-        return next;
-      });
-      setExpandedToIds((prev) => {
-        const next = new Set(prev);
-        next.delete(prevExpandedId);
-        return next;
-      });
-    }
-
-    setExpandedMessageId(nextExpandedId);
-
-    if (nextExpandedId) {
-      void ensureBodyLoaded(nextExpandedId);
-      void markAsReadIfNeeded(nextExpandedId);
+    if (!wasOpen) {
+      void ensureBodyLoaded(messageId);
+      void markAsReadIfNeeded(messageId);
     }
   };
 
@@ -1381,7 +1375,11 @@ export default function MailPage() {
 
       // Optimistic removal.
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
-      setExpandedMessageId((prev) => (prev === messageId ? null : prev));
+      setExpandedMessageIds((prev) => {
+        const next = new Set(prev);
+        next.delete(messageId);
+        return next;
+      });
       setRowActionsMessageId((prev) => (prev === messageId ? null : prev));
 
       const ok = await destroyEmail({
@@ -1895,7 +1893,7 @@ export default function MailPage() {
             </div>
           ) : (
             messages.map((msg) => {
-          const isOpen = expandedMessageId === msg.id;
+          const isOpen = expandedMessageIds.has(msg.id);
           const regionId = `message-body-${msg.id}`;
           return (
             <div

@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Update login email placeholder to `e.g. duck@mail-duck.com` (avoid `example.com` copy).
+- Improve login UX: accessible error banner with safe, actionable error buckets (credentials / network / server) and remove test/dev/domain hints from UI.
+- Change Docker Compose defaults to `VITE_DEFAULT_THEME=system`, `VITE_DEFAULT_SCHEME=duck`, and repo-friendly `VITE_LOGIN_BRANDING=DuckWebmail`.
+- Prepare repo for public release: add README (Docker Compose-first), MIT license, and trademark/commercial licensing docs (free up to 100 mailboxes; commercial trademark license above that; commercial terms do not include Stalwart).
 - Refine desktop layout: pin Inbox first in folder list (then role/system folders, then alphabetical), move search to header left, remove sidebar profile duplication and sign-out button, add thin footer with JMAP quota usage and copyright.
 - Add desktop drag & drop: move emails to folders by dragging a message onto a folder in the sidebar.
 - Add CSS "theme schemes" layer (via `data-scheme`) + compose editor defaults driven by `--compose-*` variables; no layout/spacing changes.
