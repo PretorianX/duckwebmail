@@ -1,0 +1,102 @@
+# Stalwart Mail Server (production) configuration template for duckwebmail
+#
+# Goals:
+# - Use the shared TLS cert copied from Let's Encrypt into /opt/stalwart/certs
+# - Do NOT expose the Stalwart admin UI listener publicly (no :8080 listener here)
+# - Enable only the required protocols:
+#   - SMTP (25)
+#   - Submission (587, STARTTLS)
+#   - IMAP (143, STARTTLS)
+#   - JMAP/HTTP (443, implicit TLS) for nginx proxying
+# - Require TLS where possible:
+#   - SMTP AUTH is only allowed over TLS (submission + is_tls)
+#   - IMAP disallows plain-text authentication on non-TLS connections
+#
+# Required environment variables:
+# - STALWART_PATH
+# - STALWART_ADMIN_USER
+# - STALWART_ADMIN_SECRET
+#
+# Notes:
+# - TLS files are expected at:
+#   - /opt/stalwart/certs/tls.crt
+#   - /opt/stalwart/certs/tls.key
+
+[server.listener."https"]
+bind = ["[::]:443"]
+protocol = "http"
+tls.implicit = true
+tls.certificate = "default"
+
+[server.listener."smtp"]
+bind = ["[::]:25"]
+protocol = "smtp"
+tls.certificate = "default"
+
+[server.listener."submission"]
+bind = ["[::]:587"]
+protocol = "smtp"
+tls.certificate = "default"
+
+[server.listener."imap"]
+bind = ["[::]:143"]
+protocol = "imap"
+tls.certificate = "default"
+
+# TLS certificate used when SNI is absent, and as the named certificate above.
+[certificate."default"]
+cert = "%{file:/opt/stalwart/certs/tls.crt}%"
+private-key = "%{file:/opt/stalwart/certs/tls.key}%"
+default = true
+
+# Minimal storage setup (RocksDB) persisted inside /opt/stalwart/data
+[storage]
+data = "rocksdb"
+fts = "rocksdb"
+blob = "rocksdb"
+lookup = "rocksdb"
+directory = "internal"
+
+[store."rocksdb"]
+type = "rocksdb"
+path = "%{env:STALWART_PATH}%/data"
+compression = "lz4"
+
+[directory."internal"]
+type = "internal"
+store = "rocksdb"
+
+# Bootstrap admin user for initial setup (driven from .env).
+[authentication.fallback-admin]
+user = "%{env:STALWART_ADMIN_USER}%"
+secret = "%{env:STALWART_ADMIN_SECRET}%"
+
+# SMTP submission: require auth on :587 and only allow auth mechanisms after STARTTLS.
+[session.auth]
+mechanisms = [
+  { if = "listener == 'submission' && is_tls", then = "[plain, login]" },
+  { else = false }
+]
+directory = [
+  { if = "listener == 'submission'", then = "'internal'" },
+  { else = false }
+]
+require = [
+  { if = "listener == 'submission'", then = true },
+  { else = false }
+]
+allow-plain-text = false
+must-match-sender = true
+
+# IMAP/POP3: do not allow plain-text auth without TLS (forces STARTTLS before login).
+[imap.auth]
+max-failures = 3
+allow-plain-text = false
+
+[tracer."stdout"]
+type = "stdout"
+level = "info"
+ansi = false
+enable = true
+
+

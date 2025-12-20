@@ -1,0 +1,119 @@
+services:
+  nginx:
+    image: nginx:1.27.3-alpine
+    depends_on:
+      - webmail-ui
+      - stalwart-mail
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME:?set DOMAIN_NAME in .env}
+    volumes:
+      - ./nginx/conf.d/mail.conf.template:/etc/nginx/templates/mail.conf.template:ro
+      - certbot-webroot:/var/www/certbot:ro
+      # Copy target for certbot -> shared TLS material used by nginx + Stalwart.
+      - ./stalwart-data/certs:/etc/nginx/certs:ro
+    read_only: true
+    tmpfs:
+      # nginx writes runtime state here; keep it ephemeral.
+      - /var/cache/nginx
+      - /var/run
+      # nginx docker-entrypoint generates /etc/nginx/conf.d/*.conf from templates.
+      - /etc/nginx/conf.d
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  webmail-ui:
+    image: ${WEBMAIL_IMAGE:?set WEBMAIL_IMAGE in .env}
+    environment:
+      PORT: "8002"
+      TZ: ${TZ:-UTC}
+    expose:
+      - "8002"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"const http=require('http');const req=http.get('http://127.0.0.1:8002/',res=>process.exit(res.statusCode>=200&&res.statusCode<500?0:1));req.on('error',()=>process.exit(1));req.setTimeout(2000,()=>{req.destroy();process.exit(1);});\""
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  stalwart-mail:
+    image: ${STALWART_IMAGE:?set STALWART_IMAGE in .env}
+    environment:
+      STALWART_PATH: /opt/stalwart
+      STALWART_ADMIN_USER: ${STALWART_ADMIN_USER:?set STALWART_ADMIN_USER in .env}
+      STALWART_ADMIN_SECRET: ${STALWART_ADMIN_SECRET:?set STALWART_ADMIN_SECRET in .env}
+      TZ: ${TZ:-UTC}
+    ports:
+      - "25:25"
+      - "587:587"
+      - "143:143"
+    volumes:
+      # Persistent mail data.
+      - ./stalwart-data:/opt/stalwart
+      # Production config (no admin listener; only required ports).
+      - ./stalwart/etc/config.prod.toml.template:/opt/stalwart/etc/config.toml:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 25 && nc -z 127.0.0.1 443"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # Tool container (not meant to be "up" long-term). Use:
+  # - docker compose -f docker-compose.prod.yml run --rm certbot certonly ...
+  # - docker compose -f docker-compose.prod.yml run --rm certbot renew
+  certbot:
+    image: certbot/certbot:v2.11.0
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME:?set DOMAIN_NAME in .env}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:?set LETSENCRYPT_EMAIL in .env}
+    volumes:
+      # Persist ACME account + issued certificates.
+      - letsencrypt:/etc/letsencrypt
+      # Shared HTTP-01 challenge directory served by nginx on :80.
+      - certbot-webroot:/var/www/certbot
+      # Shared TLS material (tls.crt/tls.key) consumed by nginx + Stalwart.
+      - ./stalwart-data/certs:/out/certs
+    restart: "no"
+
+volumes:
+  letsencrypt:
+  certbot-webroot:
+
+

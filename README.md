@@ -12,6 +12,13 @@ docker compose up --build
 - Stalwart Admin UI/API: `http://localhost:8080`
 - Stalwart JMAP over HTTPS: `https://localhost:10443` (self-signed TLS by default)
 
+## Production
+
+For a production setup (nginx reverse proxy + Let’s Encrypt certbot, with `mail.<domain>`), see:
+
+- `docs/production.md`
+- `docker-compose.prod.yml`
+
 ## Configuration
 
 You can set deployment defaults via environment variables (users can still override later in the UI):
