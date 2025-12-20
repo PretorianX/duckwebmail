@@ -34,6 +34,7 @@ describe("ThemeProvider storage keys", () => {
     // matchMedia is mocked to prefers light in setupTests.ts.
     expect(screen.getByTestId("theme")).toHaveTextContent("light");
     expect(document.body.dataset.theme).toBe("light");
+    expect(document.body.classList.contains("light-theme")).toBe(true);
   });
 
   test('persists under "duckwebmail:theme" (not the generic "theme" key)', async () => {
@@ -52,6 +53,7 @@ describe("ThemeProvider storage keys", () => {
 
     expect(localStorage.getItem("duckwebmail:theme")).toBe("dark");
     expect(localStorage.getItem("theme")).toBeNull();
+    expect(document.body.classList.contains("light-theme")).toBe(false);
   });
 
   test("allows selecting system theme explicitly", async () => {

@@ -1,4 +1,4 @@
-export type ThemeSchemeId = "duck" | "paper" | "mono" | "pure-email";
+export type ThemeSchemeId = "duck" | "duck2" | "paper" | "mono" | "pure-email";
 
 type CssVarName = `--${string}`;
 type CssVars = Record<CssVarName, string>;
@@ -24,6 +24,48 @@ export const THEME_SCHEMES: Record<ThemeSchemeId, ThemeScheme> = {
       "--compose-toolbar-bg": "rgba(255, 204, 0, 0.06)",
       "--compose-quote-bg": "rgba(255, 204, 0, 0.06)",
       "--compose-quote-border": "rgba(255, 204, 0, 0.9)"
+    }
+  },
+  duck2: {
+    id: "duck2",
+    label: "Duck 2.0",
+    vars: {
+      // Duck 2.0 base (dark) palette.
+      "--bg-color": "#0d1b2a",
+      "--surface-color": "#1b263b",
+      "--text-primary": "#ccd6e0",
+      "--text-secondary": "#7a8ca7",
+      "--accent-color": "#f4a261",
+      "--hover-color": "rgba(244,162,97,0.2)",
+      "--border-color": "rgba(255,255,255,0.06)",
+
+      // Keep existing app tokens aligned with the new palette.
+      "--primary-color": "var(--accent-color)",
+      "--secondary-color": "var(--surface-color)",
+      "--background-color": "var(--bg-color)",
+      "--card-background": "var(--surface-color)",
+      "--text-color": "var(--text-primary)",
+      "--light-text": "var(--text-secondary)",
+      "--shadow-color": "rgba(0, 0, 0, 0.55)",
+
+      // Map existing "duck" accents used throughout UI.
+      "--duck-orange": "var(--accent-color)",
+      "--duck-orange-light": "#f7b27d",
+      "--duck-black": "var(--text-primary)",
+      "--duck-gray": "var(--surface-color)",
+      "--duck-white": "var(--surface-color)",
+      "--duck-yellow": "#ffde59",
+
+      // Buttons use this for text on accent backgrounds (keep contrast on orange).
+      "--dark-button-text": "#0d1b2a",
+
+      // Compose defaults.
+      "--compose-font-family": "'Noto Sans', 'Inter', 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "--compose-font-size": "16px",
+      "--compose-line-height": "1.45",
+      "--compose-toolbar-bg": "rgba(244,162,97,0.10)",
+      "--compose-quote-bg": "rgba(244,162,97,0.10)",
+      "--compose-quote-border": "rgba(244,162,97,0.90)"
     }
   },
   "pure-email": {
@@ -131,7 +173,7 @@ export const THEME_SCHEMES: Record<ThemeSchemeId, ThemeScheme> = {
 };
 
 export function isThemeSchemeId(value: unknown): value is ThemeSchemeId {
-  return value === "duck" || value === "paper" || value === "mono" || value === "pure-email";
+  return value === "duck" || value === "duck2" || value === "paper" || value === "mono" || value === "pure-email";
 }
 
 function cssVarsToCss(vars: CssVars): string {

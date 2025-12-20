@@ -109,6 +109,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.body.dataset.theme = theme;
+    // Keep compatibility with CSS that expects a `.light-theme` class toggle.
+    // We treat "light" as opt-in, and "dark" as the default/base (class removed).
+    document.body.classList.toggle("light-theme", theme === "light");
   }, [theme]);
 
   useEffect(() => {

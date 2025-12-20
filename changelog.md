@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Add `duck2` ("Duck 2.0") color scheme: deep navy dark palette with soft orange accents, plus `.light-theme` body class support for automatic light/dark switching.
 - Add Settings and About pages; Settings includes theme mode/scheme, language, and time zone selection (persisted locally).
 - Remove language selection from the profile menu (moved to Settings).
 - Prefer Noto Sans as primary typeface (multilingual support) and apply compact desktop typography (14px base, 1.35 line-height) plus tighter spacing for folder list and email rows on screens ≥1024px.

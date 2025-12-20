@@ -4,15 +4,22 @@ import { schemeCss } from "./schemes";
 
 const GlobalStyle = createGlobalStyle`
   :root {
-    /* Light theme variables (taken from hide-mail_styles) */
+    /* Light theme base tokens */
+    --bg-color: #f0f0f0;
+    --surface-color: #ffffff;
+    --text-primary: #333;
+    --text-secondary: #666;
+    --accent-color: #ffcc00;
+    --hover-color: rgba(255, 204, 0, 0.08);
+    --border-color: #ddd;
+
+    /* App tokens mapped to base tokens (schemes may override either layer) */
     --primary-color: #4a90e2;
     --secondary-color: #f8f9fa;
-    --accent-color: #ffcc00;
-    --text-color: #333;
-    --light-text: #666;
-    --border-color: #ddd;
-    --background-color: #f0f0f0;
-    --card-background: #ffffff;
+    --text-color: var(--text-primary);
+    --light-text: var(--text-secondary);
+    --background-color: var(--bg-color);
+    --card-background: var(--surface-color);
     --shadow-color: rgba(0, 0, 0, 0.1);
 
     /* Duck theme colors */
@@ -43,14 +50,20 @@ const GlobalStyle = createGlobalStyle`
   }
 
   [data-theme='dark'] {
+    --bg-color: #121620;
+    --surface-color: #1e2635;
+    --text-primary: #e2e8f0;
+    --text-secondary: #a0aec0;
+    --accent-color: #ffcc00;
+    --hover-color: rgba(255, 204, 0, 0.08);
+    --border-color: #4a5568;
+
     --primary-color: #6ba5f7;
     --secondary-color: #2d3748;
-    --accent-color: #ffcc00;
-    --text-color: #e2e8f0;
-    --light-text: #a0aec0;
-    --border-color: #4a5568;
-    --background-color: #121620;
-    --card-background: #1e2635;
+    --text-color: var(--text-primary);
+    --light-text: var(--text-secondary);
+    --background-color: var(--bg-color);
+    --card-background: var(--surface-color);
     --shadow-color: rgba(0, 0, 0, 0.5);
 
     --duck-orange: #ff9f30;
@@ -66,6 +79,29 @@ const GlobalStyle = createGlobalStyle`
   }
 
 ${schemeCss}
+
+  /* Duck 2.0: light palette is enabled by adding .light-theme to <body> */
+  body.light-theme[data-scheme='duck2'] {
+    --bg-color: #f5f7fa;
+    --surface-color: #ffffff;
+    --text-primary: #34485e;
+    --text-secondary: #6b7c93;
+    --accent-color: #f4a261;
+    --hover-color: rgba(244,162,97,0.15);
+    --border-color: rgba(0,0,0,0.06);
+
+    --primary-color: var(--accent-color);
+    --secondary-color: var(--surface-color);
+    --text-color: var(--text-primary);
+    --light-text: var(--text-secondary);
+    --background-color: var(--bg-color);
+    --card-background: var(--surface-color);
+    --shadow-color: rgba(0, 0, 0, 0.10);
+
+    --duck-orange: var(--accent-color);
+    --duck-orange-light: #f7b27d;
+    --dark-button-text: #0d1b2a;
+  }
 
   * {
     box-sizing: border-box;
