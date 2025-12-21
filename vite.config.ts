@@ -27,12 +27,18 @@ function parseBimiLogoUrlFromTxt(txt: string): string | null {
 
 async function fetchBimiLogoForDomain(domain: string, selector: string): Promise<string | null> {
   const hostname = `${selector}._bimi.${domain}`;
-  const records = await dns.resolveTxt(hostname);
-  for (const rr of records) {
-    const logoUrl = parseBimiLogoUrlFromTxt(rr.join(""));
-    if (logoUrl) return logoUrl;
+  try {
+    const records = await dns.resolveTxt(hostname);
+    for (const rr of records) {
+      const logoUrl = parseBimiLogoUrlFromTxt(rr.join(""));
+      if (logoUrl) return logoUrl;
+    }
+    return null;
+  } catch (err: any) {
+    // Missing DNS record / domain is not an error for the UI; treat as "no BIMI".
+    if (err?.code === "ENOTFOUND" || err?.code === "ENODATA") return null;
+    throw err;
   }
-  return null;
 }
 
 function bimiDevApi() {
@@ -72,6 +78,14 @@ function bimiDevApi() {
           res.setHeader("Cache-Control", "no-store");
           res.end(JSON.stringify({ logoUrl }));
         } catch (err) {
+          // Missing DNS record / domain is not an error for the UI; treat as "no BIMI".
+          if ((err as any)?.code === "ENOTFOUND" || (err as any)?.code === "ENODATA") {
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "application/json");
+            res.setHeader("Cache-Control", "no-store");
+            res.end(JSON.stringify({ logoUrl: null }));
+            return;
+          }
           res.statusCode = 500;
           res.setHeader("Content-Type", "application/json");
           res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
