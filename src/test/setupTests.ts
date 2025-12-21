@@ -30,4 +30,13 @@ Object.defineProperty(window, "matchMedia", {
   })
 });
 
+// JSDOM doesn't implement ResizeObserver; MailPage uses it for virtualized row height measurement.
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).ResizeObserver = ResizeObserverMock;
+
 

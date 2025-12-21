@@ -7,6 +7,19 @@ import MailPage from "./MailPage";
 import { ThemeProvider } from "../theme/ThemeContext";
 import { LanguageProvider } from "../i18n/LanguageContext";
 
+// Virtualization makes DOM assertions brittle in unit tests; mock react-window to render all items.
+vi.mock("react-window", () => ({
+  VariableSizeList: ({ itemCount, children }: { itemCount: number; children: (args: { index: number; style: unknown }) => unknown }) => (
+    <div>
+      {Array.from({ length: itemCount }).map((_, index) => (
+        // style is ignored in tests
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        <div key={index}>{children({ index, style: {} } as any)}</div>
+      ))}
+    </div>
+  )
+}));
+
 vi.mock("../auth/AuthContext", () => {
   const activeAuth = {
     authHeader: "Basic " + btoa("test@example.com:pw"),
@@ -100,6 +113,18 @@ vi.mock("../jmap/email", () => {
     });
   };
   return {
+    // New incremental pagination helpers used by PaginationController
+    emailQueryWindow: vi.fn(
+      async ({ position, limit }: { position: number; limit: number }) => ({
+        ids: emails.slice(position, position + limit).map((e) => e.id),
+        queryState: "q1",
+        total: emails.length,
+        canCalculateChanges: true
+      })
+    ),
+    emailGetSummariesByIds: vi.fn(async ({ ids }: { ids: string[] }) => emails.filter((e) => ids.includes(e.id))),
+    emailQueryChanges: vi.fn(async () => ({ newQueryState: "q1", added: [], removed: [], total: emails.length })),
+
     clearEmailListCacheForAccount: vi.fn(),
     destroyEmail: vi.fn(async ({ emailId }: { emailId: string }) => {
       emails = emails.filter((e) => e.id !== emailId);
@@ -140,6 +165,9 @@ vi.mock("../jmap/email", () => {
 });
 
 function renderMailPage() {
+  // The message list is virtualized; increase viewport height so multiple expanded rows stay mounted in tests.
+  Object.defineProperty(window, "innerHeight", { value: 5000, configurable: true });
+  window.dispatchEvent(new Event("resize"));
   return render(
     <MemoryRouter initialEntries={["/mail"]}>
       <ThemeProvider>

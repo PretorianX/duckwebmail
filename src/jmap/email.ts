@@ -536,3 +536,148 @@ export function clearEmailListCacheForAccount(params: { apiUrl: string; accountI
     if (key.startsWith(prefix)) emailListCache.delete(key);
   }
 }
+
+/**
+ * Query a window of email IDs from a mailbox using JMAP Email/query.
+ * Returns IDs, queryState, total count, and whether changes can be calculated.
+ */
+export async function emailQueryWindow(params: {
+  apiUrl: string;
+  authHeader: string;
+  accountId: string;
+  mailboxId: string;
+  query?: string;
+  includeBody?: boolean;
+  position: number;
+  limit: number;
+}): Promise<{ ids: string[]; queryState?: string; total?: number; canCalculateChanges?: boolean }> {
+  const filter = buildEmailQueryFilter(params.mailboxId, params.query, params.includeBody);
+
+  const callId = generateCallId("emlqwin");
+  const res = await jmapRequest(params.apiUrl, params.authHeader, [JMAP_CORE, JMAP_MAIL], [
+    [
+      "Email/query",
+      {
+        accountId: params.accountId,
+        filter,
+        sort: [{ property: "receivedAt", isAscending: false }],
+        position: params.position,
+        limit: params.limit
+      },
+      callId
+    ]
+  ]);
+
+  const errText = getErrorText(res.methodResponses);
+  if (errText) throw new Error(`Email/query window failed: ${errText}`);
+
+  const payload = findResponse(res.methodResponses, callId);
+  if (!payload) throw new Error("Email/query window failed: missing response payload");
+  const query = assertEmailQueryResponse(payload);
+
+  return {
+    ids: query.ids,
+    queryState: query.queryState,
+    total: query.total,
+    canCalculateChanges: query.canCalculateChanges
+  };
+}
+
+/**
+ * Fetch email summaries by their IDs using JMAP Email/get.
+ * Returns the list of email summaries.
+ */
+export async function emailGetSummariesByIds(params: {
+  apiUrl: string;
+  authHeader: string;
+  accountId: string;
+  ids: string[];
+}): Promise<JmapEmailSummary[]> {
+  if (params.ids.length === 0) return [];
+
+  const callId = generateCallId("emlget");
+  const res = await jmapRequest(params.apiUrl, params.authHeader, [JMAP_CORE, JMAP_MAIL], [
+    [
+      "Email/get",
+      {
+        accountId: params.accountId,
+        properties: ["id", "blobId", "subject", "from", "to", "receivedAt", "preview", "keywords", "hasAttachment"],
+        ids: params.ids
+      },
+      callId
+    ]
+  ]);
+
+  const errText = getErrorText(res.methodResponses);
+  if (errText) throw new Error(`Email/get summaries failed: ${errText}`);
+
+  const payload = findResponse(res.methodResponses, callId);
+  if (!payload) throw new Error("Email/get summaries failed: missing response payload");
+  const get = assertEmailGetResponse<JmapEmailSummary>(payload);
+
+  return get.list;
+}
+
+interface EmailQueryChangesResponse {
+  accountId: string;
+  oldQueryState: string;
+  newQueryState: string;
+  added?: Array<{ id: string; position: number }>;
+  removed?: string[];
+  total?: number;
+}
+
+function assertEmailQueryChangesResponse(value: unknown): EmailQueryChangesResponse {
+  if (!value || typeof value !== "object") {
+    throw new Error("Invalid JMAP response: Email/queryChanges payload is not an object");
+  }
+  const v = value as Partial<EmailQueryChangesResponse>;
+  if (typeof v.oldQueryState !== "string" || typeof v.newQueryState !== "string") {
+    throw new Error("Invalid JMAP response: Email/queryChanges missing queryState");
+  }
+  return v as EmailQueryChangesResponse;
+}
+
+/**
+ * Query changes to an email list using JMAP Email/queryChanges.
+ * Returns the new queryState, added IDs (with positions), and removed IDs.
+ */
+export async function emailQueryChanges(params: {
+  apiUrl: string;
+  authHeader: string;
+  accountId: string;
+  mailboxId: string;
+  query?: string;
+  includeBody?: boolean;
+  queryState: string;
+}): Promise<{ newQueryState: string; added: Array<{ id: string; position: number }>; removed: string[]; total?: number }> {
+  const filter = buildEmailQueryFilter(params.mailboxId, params.query, params.includeBody);
+
+  const callId = generateCallId("emlqchg");
+  const res = await jmapRequest(params.apiUrl, params.authHeader, [JMAP_CORE, JMAP_MAIL], [
+    [
+      "Email/queryChanges",
+      {
+        accountId: params.accountId,
+        filter,
+        sort: [{ property: "receivedAt", isAscending: false }],
+        sinceQueryState: params.queryState
+      },
+      callId
+    ]
+  ]);
+
+  const errText = getErrorText(res.methodResponses);
+  if (errText) throw new Error(`Email/queryChanges failed: ${errText}`);
+
+  const payload = findResponse(res.methodResponses, callId);
+  if (!payload) throw new Error("Email/queryChanges failed: missing response payload");
+  const changes = assertEmailQueryChangesResponse(payload);
+
+  return {
+    newQueryState: changes.newQueryState,
+    added: changes.added ?? [],
+    removed: changes.removed ?? [],
+    total: changes.total
+  };
+}

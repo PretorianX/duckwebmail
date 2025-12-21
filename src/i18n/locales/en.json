@@ -63,6 +63,9 @@
     "loadingFolders": "Loading folders\u2026",
     "loadingEmails": "Loading emails\u2026",
     "loadingMessage": "Loading message\u2026",
+    "loadingMore": "Loading more\u2026",
+    "loadMore": "Load more",
+    "newMessages": "{{count}} new message(s)",
     "noFolderSelected": "No folder selected.",
     "noFolders": "No folders.",
     "noContentAvailable": "No content available for this email."

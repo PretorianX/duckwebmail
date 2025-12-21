@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes, type ReactNode, useCallback } from "react";
+import { VariableSizeList } from "react-window";
 
 
 import {
@@ -49,6 +50,7 @@ import {
   setEmailStarred,
   type JmapEmailSummary
 } from "../jmap/email";
+import { PaginationController } from "../jmap/PaginationController";
 import { fetchBimiLogo, normalizeBimiDomainKey } from "../jmap/bimi";
 import { JmapPushClient, stateChangeAffectsAccount, type StateChange } from "../jmap/webSocketPush";
 import styles from "./mail.module.css";
@@ -284,15 +286,53 @@ export default function MailPage() {
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [inlineImagesByCid, setInlineImagesByCid] = useState<Record<string, File>>({});
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [messagesError, setMessagesError] = useState<string | null>(null);
-  const [messagesTotal, setMessagesTotal] = useState<number | null>(null);
   const [bodyLoadingIds, setBodyLoadingIds] = useState<Set<string>>(() => new Set());
   const [bodyErrors, setBodyErrors] = useState<Record<string, string>>({});
   const [emailCopied, setEmailCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchIncludeBody, setSearchIncludeBody] = useState(false);
+  const [paginationMode, setPaginationMode] = useState<"infinite" | "classic">("infinite");
+  const [classicPage, setClassicPage] = useState(1);
+  const [classicPageSize, setClassicPageSize] = useState(50);
+  
+  // Pagination controller
+  const controllerRef = useRef<PaginationController | null>(null);
+  const [controllerState, setControllerState] = useState<ReturnType<PaginationController["getState"]>>(null);
+  
+  // Virtual list refs
+  const virtualListRef = useRef<VariableSizeList | null>(null);
+  const rowHeightsRef = useRef<Map<string, number>>(new Map());
+  // Base height for collapsed rows; closer to actual CSS row height to avoid visible gaps before measurement.
+  const defaultRowHeight = isDesktop ? 48 : 56;
+  const rowResizeObserversRef = useRef<Map<string, ResizeObserver>>(new Map());
+  
+  // Message body content (separate from summary)
+  const [messageBodies, setMessageBodies] = useState<Map<string, { html?: string; text?: string }>>(new Map());
+
+  // When expanding/collapsing rows, react-window must be told to recompute sizes.
+  useLayoutEffect(() => {
+    virtualListRef.current?.resetAfterIndex(0);
+  }, [expandedMessageIds]);
+  
+  // Helper to get messages from controller state
+  const messages = useMemo(() => {
+    if (!controllerState) return [];
+    return controllerState.ids.map((id) => {
+      const item = controllerState.itemsById.get(id);
+      if (!item) return null;
+      const body = messageBodies.get(id);
+      const msg = toMessage(item);
+      if (body) {
+        msg.html = body.html;
+        msg.text = body.text;
+      }
+      return msg;
+    }).filter((m): m is Message => m !== null);
+  }, [controllerState, messageBodies]);
+  
+  const messagesLoading = controllerState?.loading ?? false;
+  const messagesError = controllerState?.error ?? null;
+  const messagesTotal = null; // Will be computed if available
   // Keyed by normalized domain (lowercased), not raw email address.
   const [bimiLogos, setBimiLogos] = useState<Map<string, string | null>>(new Map());
   const activeProfileName = activeProfile.name;
@@ -732,9 +772,9 @@ export default function MailPage() {
       });
 
       // Optimistic local update: remove from the currently viewed folder list.
-      if (folderIdRef.current === params.fromFolderId) {
-        setMessages((prev) => prev.filter((m) => m.id !== params.emailId));
-        setMessagesTotal((prev) => (typeof prev === "number" ? Math.max(0, prev - 1) : prev));
+      if (folderIdRef.current === params.fromFolderId && controllerRef.current) {
+        controllerRef.current.removeItem(params.emailId);
+        syncControllerState();
         setExpandedMessageIds((prev) => {
           if (!prev.has(params.emailId)) return prev;
           const next = new Set(prev);
@@ -760,48 +800,84 @@ export default function MailPage() {
     }
   };
 
+  // Initialize controller when auth changes
+  useEffect(() => {
+    if (!auth) {
+      controllerRef.current = null;
+      setControllerState(null);
+      return;
+    }
+
+    const pageSize = isDesktop ? 50 : 30;
+    controllerRef.current = new PaginationController({
+      apiUrl: auth.session.apiUrl,
+      authHeader: auth.authHeader,
+      accountId: auth.accountId,
+      pageSize,
+      query: searchQuery.trim() || undefined,
+      includeBody: searchIncludeBody,
+      debug: true
+    });
+
+    return () => {
+      controllerRef.current = null;
+    };
+  }, [auth?.accountId, auth?.authHeader, auth?.session.apiUrl, isDesktop, searchQuery, searchIncludeBody]);
+
+  // Sync controller state to React state
+  const syncControllerState = useCallback(() => {
+    if (!controllerRef.current) {
+      setControllerState(null);
+      return;
+    }
+    const state = controllerRef.current.getState();
+    setControllerState(state);
+  }, []);
+
+  // Load messages using controller
   const loadMessages = async (opts?: { force?: boolean; query?: string; includeBody?: boolean }) => {
     if (!auth) return;
     if (!folderId) return;
+    if (!controllerRef.current) return;
+
     const targetFolderId = folderId;
-    // Capture search params at call time to avoid stale closures
     const q = opts?.query ?? searchQuery;
     const body = opts?.includeBody ?? searchIncludeBody;
-    // Limit to 5 results when searching, 50 otherwise
-    const limit = q.trim() ? 5 : 50;
 
-    setMessagesError(null);
-    setMessagesLoading(true);
-    try {
-      const res = await listEmailSummariesInMailbox({
+    // Update controller query params if changed
+    if (controllerRef.current) {
+      // Recreate controller if query params changed
+      const pageSize = isDesktop ? 50 : 30;
+      controllerRef.current = new PaginationController({
         apiUrl: auth.session.apiUrl,
         authHeader: auth.authHeader,
         accountId: auth.accountId,
-        mailboxId: targetFolderId,
-        limit,
-        force: opts?.force,
+        pageSize,
         query: q.trim() || undefined,
-        includeBody: body
+        includeBody: body,
+        debug: true
       });
-      // If user switched folders mid-request, ignore the result.
-      if (targetFolderId !== folderId) return;
-      const newMessages = res.emails.map(toMessage);
-      setMessages(newMessages);
-      setMessagesTotal(typeof res.total === "number" ? res.total : null);
-      setBodyErrors({});
-      setBodyLoadingIds(new Set());
+    }
+
+    try {
+      await controllerRef.current.initQuery(targetFolderId);
+      syncControllerState();
       
-      // Fetch BIMI logos for all unique sender domains
+      // Fetch BIMI logos for loaded messages
+      const state = controllerRef.current.getState();
+      if (state) {
       const senderDomains = new Set<string>();
-      for (const msg of newMessages) {
-        const senderEmail = msg.fromRaw?.[0]?.email;
+        for (const id of state.ids.slice(0, 50)) { // First 50 for BIMI
+          const item = state.itemsById.get(id);
+          if (item) {
+            const senderEmail = item.from?.[0]?.email;
         const domain = senderEmail ? normalizeBimiDomainKey(senderEmail) : null;
         if (domain) {
           senderDomains.add(domain);
+            }
         }
       }
       
-      // Fetch BIMI logos in parallel
       const logoPromises = Array.from(senderDomains).map(async (domain) => {
         const logoUrl = await fetchBimiLogo(domain);
         return { domain, logoUrl };
@@ -815,28 +891,31 @@ export default function MailPage() {
         }
         return next;
       });
+      }
     } catch (err) {
-      if (targetFolderId !== folderId) return;
-      setMessagesError(err instanceof Error ? err.message : "Failed to load emails");
-      setMessages([]);
-      setMessagesTotal(null);
-    } finally {
-      if (targetFolderId === folderId) setMessagesLoading(false);
+      syncControllerState();
+      console.error("Failed to load messages:", err);
     }
   };
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth) {
+      setControllerState(null);
+      return;
+    }
     if (!folderId) {
-      setMessages([]);
-      setMessagesTotal(null);
-      setMessagesError(null);
-      setMessagesLoading(false);
+      if (controllerRef.current) {
+        controllerRef.current.reset(null);
+      }
+      setControllerState(null);
       setBodyErrors({});
       setBodyLoadingIds(new Set());
       return;
     }
     // Always force refresh when folder changes to avoid stale cached data
+    if (controllerRef.current) {
+      controllerRef.current.reset(folderId);
+    }
     void loadMessages({ force: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth?.accountId, auth?.authHeader, auth?.session.apiUrl, folderId]);
@@ -927,12 +1006,13 @@ export default function MailPage() {
           );
         }
 
-        if (affectsEmail && folderIdRef.current) {
-          console.log("[JmapPush] Refreshing messages...");
+        if (affectsEmail && folderIdRef.current && controllerRef.current) {
+          console.log("[JmapPush] Refreshing message list head...");
           refreshPromises.push(
             (async () => {
-              await loadMessages({ force: true });
-              console.log("[JmapPush] Messages refreshed in", Math.round(performance.now() - startTime), "ms");
+              await controllerRef.current!.refreshHead();
+              syncControllerState();
+              console.log("[JmapPush] Message list head refreshed in", Math.round(performance.now() - startTime), "ms");
             })()
           );
         }
@@ -1264,11 +1344,12 @@ export default function MailPage() {
         const resolved = body.html
           ? await resolveCidImagesToObjectUrls(body.html, body.bodyStructure)
           : { html: body.html ?? "", objectUrls: [] };
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === targetMessageId ? { ...m, html: resolved.html || m.html, text: body.text ?? m.text } : m
-          )
-        );
+        // Store body content separately
+        setMessageBodies((prev) => {
+          const next = new Map(prev);
+          next.set(targetMessageId, { html: resolved.html || undefined, text: body.text });
+          return next;
+        });
       } catch (err) {
         setBodyErrors((prev) => ({
           ...prev,
@@ -1285,12 +1366,19 @@ export default function MailPage() {
 
     const markAsReadIfNeeded = async (targetMessageId: string) => {
       if (!auth) return;
+      if (!controllerRef.current) return;
+      
       // Find the message and check if it's unread
-      const msg = messages.find((m) => m.id === targetMessageId);
-      if (!msg || !msg.unread) return;
+      const state = controllerRef.current.getState();
+      const item = state?.itemsById.get(targetMessageId);
+      if (!item || !isUnread(item.keywords)) return;
 
       // Optimistically update local state
-      setMessages((prev) => prev.map((m) => (m.id === targetMessageId ? { ...m, unread: false } : m)));
+      controllerRef.current.updateItem(targetMessageId, (email) => ({
+        ...email,
+        keywords: { ...email.keywords, "$seen": true }
+      }));
+      syncControllerState();
 
       // Send JMAP request to mark as read
       const success = await markEmailAsRead({
@@ -1303,6 +1391,14 @@ export default function MailPage() {
       if (success) {
         // Refresh mailboxes to update unread counts
         void loadMailboxes({ force: true });
+      } else {
+        // Revert on failure
+        controllerRef.current.updateItem(targetMessageId, (email) => {
+          const keywords = { ...email.keywords };
+          delete keywords["$seen"];
+          return { ...email, keywords };
+        });
+        syncControllerState();
       }
     };
 
@@ -1335,12 +1431,19 @@ export default function MailPage() {
   const toggleStar = (messageId: string) => {
     const run = async () => {
       if (!auth) return;
-      const current = messages.find((m) => m.id === messageId);
-      if (!current) return;
-      const nextStarred = !current.starred;
+      if (!controllerRef.current) return;
+      
+      const state = controllerRef.current.getState();
+      const item = state?.itemsById.get(messageId);
+      if (!item) return;
+      const nextStarred = !isStarred(item.keywords);
 
       // Optimistic update.
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, starred: nextStarred } : m)));
+      controllerRef.current.updateItem(messageId, (email) => ({
+        ...email,
+        keywords: { ...email.keywords, "$flagged": nextStarred ? true : undefined }
+      }));
+      syncControllerState();
 
       const ok = await setEmailStarred({
         apiUrl: auth.session.apiUrl,
@@ -1352,12 +1455,17 @@ export default function MailPage() {
 
       if (!ok) {
         // Revert on failure.
-        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, starred: !nextStarred } : m)));
-        return;
+        controllerRef.current.updateItem(messageId, (email) => {
+          const keywords = { ...email.keywords };
+          if (nextStarred) {
+            delete keywords["$flagged"];
+          } else {
+            keywords["$flagged"] = true;
+          }
+          return { ...email, keywords };
+        });
+        syncControllerState();
       }
-
-      clearEmailListCacheForAccount({ apiUrl: auth.session.apiUrl, accountId: auth.accountId });
-      void loadMessages({ force: true });
     };
 
     void run();
@@ -1437,10 +1545,18 @@ export default function MailPage() {
     void run();
   };
 
-  const rowActionsMessage = useMemo(
-    () => (rowActionsMessageId ? messages.find((m) => m.id === rowActionsMessageId) ?? null : null),
-    [messages, rowActionsMessageId]
-  );
+  const rowActionsMessage = useMemo(() => {
+    if (!rowActionsMessageId || !controllerState) return null;
+    const item = controllerState.itemsById.get(rowActionsMessageId);
+    if (!item) return null;
+    const body = messageBodies.get(rowActionsMessageId);
+    const msg = toMessage(item);
+    if (body) {
+      msg.html = body.html;
+      msg.text = body.text;
+    }
+    return msg;
+  }, [controllerState, rowActionsMessageId, messageBodies]);
 
   const formatBytes = (bytes: number) => {
     const units = ["B", "KB", "MB", "GB"];
@@ -1896,20 +2012,39 @@ export default function MailPage() {
               🦆
             </span>
             <span className={styles.folderSwitcherName}>{folder.name}</span>
-            <span className={styles.count}>({messagesTotal ?? messages.length})</span>
+            <span className={styles.count}>({controllerState?.ids.length ?? 0})</span>
             <ChevronDown className={`${styles.icon} ${styles.folderSwitcherChevron}`} aria-hidden="true" />
           </button>
           <ProfileMenu />
         </div>
 
         <section
-          ref={(el) => {
-            listRef.current = el;
-          }}
           className={styles.list}
           aria-label={t("mail.messageList")}
+          style={{ position: "relative", height: "100%", overflow: "hidden" }}
         >
-          {messagesLoading ? (
+          {controllerState?.pendingNewCount && controllerState.pendingNewCount > 0 ? (
+            <div style={{ padding: "8px", textAlign: "center" }}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => {
+                  if (controllerRef.current) {
+                    const firstVisibleId = controllerState?.ids[0] ?? null;
+                    controllerRef.current.applyPendingNewMessages(firstVisibleId);
+                    syncControllerState();
+                    if (virtualListRef.current && firstVisibleId) {
+                      const index = controllerState?.ids.indexOf(firstVisibleId) ?? 0;
+                      virtualListRef.current.scrollToItem(index, "start");
+                    }
+                  }
+                }}
+              >
+                {t("mail.newMessages", { count: controllerState.pendingNewCount })}
+              </button>
+            </div>
+          ) : null}
+          {messagesLoading && messages.length === 0 ? (
             <div className={styles.loadingState} aria-live="polite">
               <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
               {searchQuery.trim() ? t("mail.searching") : t("mail.loadingEmails")}
@@ -1921,25 +2056,139 @@ export default function MailPage() {
                 {t("common.retry")}
               </button>
             </div>
-          ) : messages.length === 0 ? (
+          ) : messages.length === 0 && !messagesLoading ? (
             <div className={styles.emptyState}>
               {searchQuery.trim()
                 ? t("mail.noResultsForQuery", { query: searchQuery.trim() })
                 : t("mail.noEmailsInFolder")}
             </div>
-          ) : (
-            messages.map((msg) => {
-          const isOpen = expandedMessageIds.has(msg.id);
-          const regionId = `message-body-${msg.id}`;
-          return (
-            <div
-              key={msg.id}
-              ref={(el) => {
-                if (el) rowGroupRefs.current.set(msg.id, el);
-                else rowGroupRefs.current.delete(msg.id);
+          ) : messages.length > 0 ? (
+            <VariableSizeList
+              ref={virtualListRef}
+              height={isDesktop ? window.innerHeight - 150 : window.innerHeight - 200}
+              itemCount={messages.length + (controllerState?.hasMore ? 1 : 0)}
+              itemSize={(index) => {
+                if (index >= messages.length) return 60; // Load more row
+                const msg = messages[index];
+                const isOpen = expandedMessageIds.has(msg.id);
+                const cachedHeight = rowHeightsRef.current.get(msg.id);
+                if (cachedHeight) return cachedHeight;
+                // Conservative estimate; real height comes from measurement below.
+                return isOpen ? 360 : defaultRowHeight;
               }}
-              className={`${styles.rowGroup} ${isOpen ? styles.rowGroupOpen : ""}`}
+              width="100%"
+              onItemsRendered={({ visibleStopIndex }) => {
+                // Infinite scroll: load more when near the end
+                if (
+                  controllerState &&
+                  controllerState.hasMore &&
+                  !controllerState.loadingNext &&
+                  visibleStopIndex >= messages.length - 10
+                ) {
+                  if (controllerRef.current) {
+                    void controllerRef.current.loadNextPage().then(() => {
+                      syncControllerState();
+                      if (virtualListRef.current) {
+                        virtualListRef.current.resetAfterIndex(visibleStopIndex - 5);
+                      }
+                    });
+                  }
+                }
+              }}
+              style={{ outline: "none" }}
             >
+              {({ index, style }) => {
+                if (index >= messages.length) {
+                  // Load more / loading / error row
+                  return (
+                    <div style={style}>
+                      <div style={{ padding: "16px", textAlign: "center" }}>
+                        {controllerState?.loadingNext ? (
+                          <>
+                            <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
+                            {t("mail.loadingMore")}
+                          </>
+                        ) : controllerState?.errorNext ? (
+                          <>
+                            <div>{controllerState.errorNext}</div>
+                            <button
+                              type="button"
+                              className={styles.secondaryButton}
+                              onClick={() => {
+                                if (controllerRef.current) {
+                                  void controllerRef.current.loadNextPage().then(() => syncControllerState());
+                                }
+                              }}
+                            >
+                              {t("common.retry")}
+                            </button>
+                          </>
+                        ) : controllerState?.hasMore ? (
+                          <button
+                            type="button"
+                            className={styles.secondaryButton}
+                            onClick={() => {
+                              if (controllerRef.current) {
+                                void controllerRef.current.loadNextPage().then(() => syncControllerState());
+                              }
+                            }}
+                          >
+                            {t("mail.loadMore")}
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                }
+                
+                const msg = messages[index];
+          return (
+                  <div key={msg.id} style={style}>
+                    <div
+                      ref={(el) => {
+                        // IMPORTANT:
+                        // - Measure the real row content (not the react-window wrapper which is forced to itemSize)
+                        // - Use ResizeObserver because row height changes after render (CSS max-height transition, images, etc.)
+                        const existingObserver = rowResizeObserversRef.current.get(msg.id);
+
+                        if (!el) {
+                          rowGroupRefs.current.delete(msg.id);
+                          if (existingObserver) {
+                            existingObserver.disconnect();
+                            rowResizeObserversRef.current.delete(msg.id);
+                          }
+                          return;
+                        }
+
+                        rowGroupRefs.current.set(msg.id, el);
+
+                        if (!existingObserver) {
+                          const observer = new ResizeObserver(() => {
+                            const measured = Math.ceil(el.getBoundingClientRect().height);
+                            const current = rowHeightsRef.current.get(msg.id);
+                            if (measured > 0 && current !== measured) {
+                              rowHeightsRef.current.set(msg.id, measured);
+                              virtualListRef.current?.resetAfterIndex(index);
+                            }
+                          });
+                          observer.observe(el);
+                          rowResizeObserversRef.current.set(msg.id, observer);
+                        }
+
+                        // Prime initial measurement immediately.
+                        const measured = Math.ceil(el.getBoundingClientRect().height);
+                        const current = rowHeightsRef.current.get(msg.id);
+                        if (measured > 0 && current !== measured) {
+                          rowHeightsRef.current.set(msg.id, measured);
+                          virtualListRef.current?.resetAfterIndex(index);
+                        }
+                      }}
+                    >
+                      {(() => {
+                      const isOpen = expandedMessageIds.has(msg.id);
+                      const regionId = `message-body-${msg.id}`;
+                      return (
+                        <div className={`${styles.rowGroup} ${isOpen ? styles.rowGroupOpen : ""}`}>
               <div
                 className={`${styles.row} ${canDragEmails ? styles.rowDraggable : ""} ${isOpen ? styles.rowOpen : ""}`}
                 role="button"
@@ -2122,8 +2371,13 @@ export default function MailPage() {
               </div>
             </div>
           );
-            })
-          )}
+                    })()}
+                    </div>
+                  </div>
+                );
+              }}
+            </VariableSizeList>
+          ) : null}
         </section>
 
         <footer className={styles.appFooter}>

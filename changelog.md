@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Implement incremental JMAP pagination with virtualized message list: add `PaginationController` for cursor-based windowed loading (`Email/query` with `position`/`limit`), mailbox-scoped state store with LRU cache, `react-window` `VariableSizeList` for efficient rendering of large folders (200+ messages), infinite scroll with "Load more" fallback, "New messages" pill that applies pending changes without scroll jump, and `Email/queryChanges` integration (with head requery fallback) for consistency when new mail arrives. Fixes "only first chunk exists" bug and enables smooth browsing of large folders.
 - Render plain-text email bodies with correct newlines by normalizing CRLF and literal `\\r\\n` sequences before display.
 - Fix BIMI logo display in dev and production: serve `/api/bimi` in Vite dev server, correct BIMI DNS hostname format (`default._bimi.<domain>`), and key logo cache/lookups by normalized sender domain so logos consistently render for supported senders (e.g., Namecheap).
 - Implement BIMI (Brand Indicators for Message Identification) logo fetching: add server endpoint `/api/bimi` to query DNS TXT records for BIMI logos, create client-side utility with caching, and display BIMI logos in email list instead of initials when available. Supports both default selector and custom selectors (e.g., `_bimi_84l7e_817`).

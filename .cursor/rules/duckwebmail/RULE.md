@@ -2,7 +2,7 @@
 alwaysApply: true
 ---
 - webmail bassed on jmap protocol
-- use websockets for jmap protocol
+- use websockets whenre possible for jmap protocol
 - mobile first
 - no ads
 - emails are shown as list
