@@ -244,6 +244,7 @@ export default function MailPage() {
   const { t } = useTranslation();
   const { activeAuth: auth, activeProfile } = useAuth();
   const isDesktop = useMediaQuery("(min-width: 768px)");
+  const isDenseDesktop = useMediaQuery("(min-width: 1024px)");
   const sendMenuRef = useRef<HTMLDivElement | null>(null);
   const attachmentsInputRef = useRef<HTMLInputElement | null>(null);
   const scheduledForInputRef = useRef<HTMLInputElement | null>(null);
@@ -302,18 +303,18 @@ export default function MailPage() {
   // Virtual list refs
   const virtualListRef = useRef<VariableSizeList | null>(null);
   const rowHeightsRef = useRef<Map<string, number>>(new Map());
-  // Base height for collapsed rows; closer to actual CSS row height to avoid visible gaps before measurement.
-  // Includes 4px bottom padding from rowWrapper for gap between rows.
-  const defaultRowHeight = isDesktop ? 52 : 56;
+  // Base height for collapsed rows; must match actual measured height to avoid visible jump.
+  // Dense desktop (1024px+) measures to 43px.
+  const defaultRowHeight = isDenseDesktop ? 43 : isDesktop ? 48 : 56;
   const rowResizeObserversRef = useRef<Map<string, ResizeObserver>>(new Map());
   
   // Message body content (separate from summary)
   const [messageBodies, setMessageBodies] = useState<Map<string, { html?: string; text?: string }>>(new Map());
 
-  // When expanding/collapsing rows, react-window must be told to recompute sizes.
+  // When expanding/collapsing rows or breakpoint changes, react-window must recompute sizes.
   useLayoutEffect(() => {
     virtualListRef.current?.resetAfterIndex(0);
-  }, [expandedMessageIds]);
+  }, [expandedMessageIds, isDenseDesktop]);
   
   // Helper to get messages from controller state
   const messages = useMemo(() => {
@@ -2146,7 +2147,6 @@ export default function MailPage() {
           return (
                   <div key={msg.id} style={style}>
                     <div
-                      className={styles.rowWrapper}
                       ref={(el) => {
                         // IMPORTANT:
                         // - Measure the real row content (not the react-window wrapper which is forced to itemSize)
@@ -2244,11 +2244,8 @@ export default function MailPage() {
                       </>
                     )}
                   </div>
-                  <div className={`${styles.rightCell} ${isOpen ? styles.rightCellExpanded : ""}`} data-col="date" onClick={(e) => e.stopPropagation()}>
+                  <div className={styles.rightCell} data-col="date" onClick={(e) => e.stopPropagation()}>
                     <div className={styles.rightMeta}>
-                      <div className={styles.date} title={new Date(msg.receivedAt).toLocaleString()}>
-                        {formatListArrivalTime(msg.receivedAt)}
-                      </div>
                       {msg.hasAttachments && (
                         <div
                           className={styles.attachmentIndicator}
@@ -2258,6 +2255,9 @@ export default function MailPage() {
                           <Paperclip className={styles.icon} aria-hidden="true" />
                         </div>
                       )}
+                      <div className={styles.date} title={new Date(msg.receivedAt).toLocaleString()}>
+                        {formatListArrivalTime(msg.receivedAt)}
+                      </div>
                       <button
                         type="button"
                         className={`${styles.iconButton} ${styles.moreButton}`}
@@ -2268,15 +2268,6 @@ export default function MailPage() {
                         <MoreHorizontal className={styles.icon} aria-hidden="true" />
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      className={styles.mobileActionButton}
-                      aria-label={t("mail.moreActionsSubject", { subject: msg.subject })}
-                      title={t("mail.moreActions")}
-                      onClick={() => setRowActionsMessageId(msg.id)}
-                    >
-                      <MoreHorizontal className={styles.icon} aria-hidden="true" />
-                    </button>
                   </div>
                 </div>
               </div>
