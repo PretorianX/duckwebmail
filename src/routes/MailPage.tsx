@@ -49,6 +49,7 @@ import {
   setEmailStarred,
   type JmapEmailSummary
 } from "../jmap/email";
+import { fetchBimiLogo, normalizeBimiDomainKey } from "../jmap/bimi";
 import { JmapPushClient, stateChangeAffectsAccount, type StateChange } from "../jmap/webSocketPush";
 import styles from "./mail.module.css";
 
@@ -292,6 +293,8 @@ export default function MailPage() {
   const [emailCopied, setEmailCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchIncludeBody, setSearchIncludeBody] = useState(false);
+  // Keyed by normalized domain (lowercased), not raw email address.
+  const [bimiLogos, setBimiLogos] = useState<Map<string, string | null>>(new Map());
   const activeProfileName = activeProfile.name;
   const [canDragFolders, setCanDragFolders] = useState(false);
   const canDragEmails = canDragFolders;
@@ -782,10 +785,36 @@ export default function MailPage() {
       });
       // If user switched folders mid-request, ignore the result.
       if (targetFolderId !== folderId) return;
-      setMessages(res.emails.map(toMessage));
+      const newMessages = res.emails.map(toMessage);
+      setMessages(newMessages);
       setMessagesTotal(typeof res.total === "number" ? res.total : null);
       setBodyErrors({});
       setBodyLoadingIds(new Set());
+      
+      // Fetch BIMI logos for all unique sender domains
+      const senderDomains = new Set<string>();
+      for (const msg of newMessages) {
+        const senderEmail = msg.fromRaw?.[0]?.email;
+        const domain = senderEmail ? normalizeBimiDomainKey(senderEmail) : null;
+        if (domain) {
+          senderDomains.add(domain);
+        }
+      }
+      
+      // Fetch BIMI logos in parallel
+      const logoPromises = Array.from(senderDomains).map(async (domain) => {
+        const logoUrl = await fetchBimiLogo(domain);
+        return { domain, logoUrl };
+      });
+      
+      const logoResults = await Promise.all(logoPromises);
+      setBimiLogos((prev) => {
+        const next = new Map(prev);
+        for (const { domain, logoUrl } of logoResults) {
+          next.set(domain, logoUrl);
+        }
+        return next;
+      });
     } catch (err) {
       if (targetFolderId !== folderId) return;
       setMessagesError(err instanceof Error ? err.message : "Failed to load emails");
@@ -1942,7 +1971,15 @@ export default function MailPage() {
               >
                 <div className={styles.rowGrid}>
                   <div className={styles.bimi} data-col="icon" aria-hidden="true" title="BIMI">
-                    {getBimiInitial(formatSenderForList(msg.fromRaw) || msg.from)}
+                    {(() => {
+                      const senderEmail = msg.fromRaw?.[0]?.email;
+                      const domain = senderEmail ? normalizeBimiDomainKey(senderEmail) : null;
+                      const logoUrl = domain ? bimiLogos.get(domain) : null;
+                      if (logoUrl) {
+                        return <img src={logoUrl} alt="" className={styles.bimiLogo} />;
+                      }
+                      return getBimiInitial(formatSenderForList(msg.fromRaw) || msg.from);
+                    })()}
                   </div>
                   <div className={`${styles.from} ${msg.unread ? styles.unreadText : ""}`} data-col="from">
                     {formatSenderForList(msg.fromRaw) || "(no sender)"}

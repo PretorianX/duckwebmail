@@ -1,8 +1,88 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import dns from "node:dns/promises";
+
+function parseBimiLogoUrlFromTxt(txt: string): string | null {
+  if (!txt) return null;
+  const parts = String(txt)
+    .split(";")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const kv = new Map<string, string>();
+  for (const p of parts) {
+    const eq = p.indexOf("=");
+    if (eq <= 0) continue;
+    const k = p.slice(0, eq).trim().toLowerCase();
+    const v = p.slice(eq + 1).trim();
+    if (k) kv.set(k, v);
+  }
+
+  const version = kv.get("v");
+  if (!version || version.toUpperCase() !== "BIMI1") return null;
+
+  const l = kv.get("l");
+  return l ? l.trim() : null;
+}
+
+async function fetchBimiLogoForDomain(domain: string, selector: string): Promise<string | null> {
+  const hostname = `${selector}._bimi.${domain}`;
+  const records = await dns.resolveTxt(hostname);
+  for (const rr of records) {
+    const logoUrl = parseBimiLogoUrlFromTxt(rr.join(""));
+    if (logoUrl) return logoUrl;
+  }
+  return null;
+}
+
+function bimiDevApi() {
+  return {
+    name: "duckwebmail:bimi-dev-api",
+    apply: "serve",
+    configureServer(server: { middlewares: { use: (fn: unknown) => void } }) {
+      // Dev-only BIMI endpoint. In prod, `server.mjs` serves this.
+      server.middlewares.use(async (req: { url?: string }, res: any, next: () => void) => {
+        try {
+          if (!req.url) return next();
+          const url = new URL(req.url, "http://localhost");
+          if (url.pathname !== "/api/bimi") return next();
+
+          const domain = url.searchParams.get("domain")?.trim() ?? "";
+          const selector = (url.searchParams.get("selector")?.trim() || "default").toLowerCase();
+
+          if (!domain) {
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "Missing domain parameter" }));
+            return;
+          }
+
+          if (
+            !/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i.test(domain)
+          ) {
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "Invalid domain format" }));
+            return;
+          }
+
+          const logoUrl = await fetchBimiLogoForDomain(domain.toLowerCase(), selector);
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("Cache-Control", "no-store");
+          res.end(JSON.stringify({ logoUrl }));
+        } catch (err) {
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+      });
+    }
+  };
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), bimiDevApi()],
   server: {
     proxy: {
       "/.well-known/jmap": {
