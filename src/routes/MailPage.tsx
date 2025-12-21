@@ -2244,7 +2244,7 @@ export default function MailPage() {
                       </>
                     )}
                   </div>
-                  <div className={styles.rightCell} data-col="date" onClick={(e) => e.stopPropagation()}>
+                  <div className={`${styles.rightCell} ${isOpen ? styles.rightCellExpanded : ""}`} data-col="date" onClick={(e) => e.stopPropagation()}>
                     <div className={styles.rightMeta}>
                       {msg.hasAttachments && (
                         <div
@@ -2268,6 +2268,15 @@ export default function MailPage() {
                         <MoreHorizontal className={styles.icon} aria-hidden="true" />
                       </button>
                     </div>
+                    <button
+                      type="button"
+                      className={styles.mobileActionButton}
+                      aria-label={t("mail.moreActionsSubject", { subject: msg.subject })}
+                      title={t("mail.moreActions")}
+                      onClick={() => setRowActionsMessageId(msg.id)}
+                    >
+                      <MoreHorizontal className={styles.icon} aria-hidden="true" />
+                    </button>
                   </div>
                 </div>
               </div>
