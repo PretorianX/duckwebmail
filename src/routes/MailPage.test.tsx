@@ -107,6 +107,14 @@ vi.mock("../jmap/email", () => {
     }),
     formatAddressList: (value: Array<{ name?: string | null; email: string }> | undefined) =>
       (value ?? []).map((a) => (a.name ? `${a.name} <${a.email}>` : a.email)).join(", "),
+    formatSenderForList: (value: Array<{ name?: string | null; email: string }> | undefined) => {
+      const first = (value ?? [])[0];
+      if (!first) return "";
+      const name = (first.name ?? "").trim();
+      const email = (first.email ?? "").trim();
+      if (name) return name.replace(/^["']|["']$/g, "").trim();
+      return email;
+    },
     getEmailBody: vi.fn(async ({ emailId }: { emailId: string }) => ({
       html: `<p>Body for ${emailId}</p>`,
       text: `Body for ${emailId}`

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Render plain-text email bodies with correct newlines by normalizing CRLF and literal `\\r\\n` sequences before display.
 - Fix BIMI logo display in dev and production: serve `/api/bimi` in Vite dev server, correct BIMI DNS hostname format (`default._bimi.<domain>`), and key logo cache/lookups by normalized sender domain so logos consistently render for supported senders (e.g., Namecheap).
 - Implement BIMI (Brand Indicators for Message Identification) logo fetching: add server endpoint `/api/bimi` to query DNS TXT records for BIMI logos, create client-side utility with caching, and display BIMI logos in email list instead of initials when available. Supports both default selector and custom selectors (e.g., `_bimi_84l7e_817`).
 - Redesign folder list (left sidebar) for desktop: achieve 2×+ vertical density with compact 28-32px row height, reduced padding (4px 8px), optimized typography (13px font, 1.25 line-height), smaller icons (14px), and subtle hover/active states. Removed excessive gaps and spacing while maintaining clarity and fast scanning.

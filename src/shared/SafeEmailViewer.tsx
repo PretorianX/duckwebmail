@@ -3,6 +3,23 @@ import DOMPurify from "dompurify";
 import styled, { keyframes } from "styled-components";
 import { useTranslation } from "react-i18next";
 
+function normalizePlainTextForDisplay(value: string): string {
+  // Some servers/paths deliver plain text with literal escape sequences ("\\r\\n")
+  // instead of actual CRLF characters. Normalize both forms to "\n" so CSS `pre-wrap`
+  // can render line breaks correctly.
+  const hasLiteralEscapes = value.includes("\\r") || value.includes("\\n");
+  const step1 = hasLiteralEscapes
+    ? value.replaceAll("\\r\\n", "\n").replaceAll("\\n", "\n").replaceAll("\\r", "\n")
+    : value;
+  return step1.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+}
+
+function looksLikeHtmlMarkup(value: string): boolean {
+  // Heuristic: treat as HTML only when we see real tag syntax like "<p>" or "</div>".
+  // This avoids mis-classifying a "fake htmlBody" that is actually plain text with newlines.
+  return /<\/?[a-zA-Z][\s\S]*?>/.test(value);
+}
+
 const spin = keyframes`
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -94,8 +111,13 @@ export default function SafeEmailViewer({
     );
   }, [htmlContent]);
 
+  const normalizedText = useMemo(() => normalizePlainTextForDisplay(textContent || ""), [textContent]);
+  const normalizedHtmlAsText = useMemo(() => normalizePlainTextForDisplay(sanitizedHtml || ""), [sanitizedHtml]);
+
   const srcDoc = useMemo(() => {
     if (!sanitizedHtml) return "";
+    // If "htmlBody" is actually plain text (no markup), render it as plain text so newlines work.
+    if (!looksLikeHtmlMarkup(sanitizedHtml)) return "";
     return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><base target="_blank" /><style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333;margin:0;padding:15px}img{max-width:100%;height:auto}</style></head><body>${sanitizedHtml}</body></html>`;
   }, [sanitizedHtml]);
 
@@ -141,7 +163,7 @@ export default function SafeEmailViewer({
 
   return (
     <EmailContainer className={className}>
-      <div className="plain-text">{textContent || t("mail.noContentAvailable")}</div>
+      <div className="plain-text">{normalizedText || normalizedHtmlAsText || t("mail.noContentAvailable")}</div>
     </EmailContainer>
   );
 }
