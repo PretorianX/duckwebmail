@@ -14,7 +14,9 @@ export interface MailboxListState {
   pageSize: number;
   hasMore: boolean;
   loading: boolean;
+  loadingNext: boolean;
   error: string | null;
+  errorNext: string | null;
   lastRefreshAt: number;
   canCalculateChanges?: boolean;
   pendingNewIds: string[];
@@ -72,7 +74,9 @@ export function getMailboxListState(
       pageSize,
       hasMore: true,
       loading: false,
+      loadingNext: false,
       error: null,
+      errorNext: null,
       lastRefreshAt: 0,
       canCalculateChanges: undefined,
       pendingNewIds: [],

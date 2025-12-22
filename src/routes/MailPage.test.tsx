@@ -1,3 +1,4 @@
+import type React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -9,12 +10,11 @@ import { LanguageProvider } from "../i18n/LanguageContext";
 
 // Virtualization makes DOM assertions brittle in unit tests; mock react-window to render all items.
 vi.mock("react-window", () => ({
-  VariableSizeList: ({ itemCount, children }: { itemCount: number; children: (args: { index: number; style: unknown }) => unknown }) => (
+  VariableSizeList: ({ itemCount, children }: { itemCount: number; children: (args: { index: number; style: React.CSSProperties }) => React.ReactNode }) => (
     <div>
       {Array.from({ length: itemCount }).map((_, index) => (
         // style is ignored in tests
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        <div key={index}>{children({ index, style: {} } as any)}</div>
+        <div key={index}>{children({ index, style: {} })}</div>
       ))}
     </div>
   )

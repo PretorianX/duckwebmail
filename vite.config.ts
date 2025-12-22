@@ -1,5 +1,6 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
+// @ts-expect-error - node:dns/promises requires @types/node which conflicts with browser env
 import dns from "node:dns/promises";
 
 function parseBimiLogoUrlFromTxt(txt: string): string | null {
@@ -42,13 +43,14 @@ async function fetchBimiLogoForDomain(domain: string, selector: string): Promise
   }
 }
 
-function bimiDevApi() {
+function bimiDevApi(): Plugin {
   return {
     name: "duckwebmail:bimi-dev-api",
     apply: "serve",
-    configureServer(server: { middlewares: { use: (fn: unknown) => void } }) {
+    configureServer(server) {
       // Dev-only BIMI endpoint. In prod, `server.mjs` serves this.
-      server.middlewares.use(async (req: { url?: string }, res: { statusCode: number; setHeader: (k: string, v: string) => void; end: (body: string) => void }, next: () => void) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      server.middlewares.use(async (req: any, res: any, next: () => void) => {
         try {
           if (!req.url) return next();
           const url = new URL(req.url, "http://localhost");

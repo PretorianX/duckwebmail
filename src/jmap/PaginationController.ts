@@ -417,7 +417,7 @@ export class PaginationController {
       loadingNext: state.loadingNext ?? false,
       error: state.error,
       errorNext: state.errorNext ?? null,
-      total: undefined, // Will be computed from queryState if needed
+      total: null, // Will be computed from queryState if needed
       pendingNewCount: state.pendingNewIds.length,
       canCalculateChanges: state.canCalculateChanges ?? false
     };
