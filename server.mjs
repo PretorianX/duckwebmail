@@ -126,7 +126,7 @@ async function handleBimiRequest(req, res) {
               logoUrl = match[1].trim();
             }
           }
-        } catch (err) {
+        } catch {
           // Ignore DNS errors for alternative format
         }
       }

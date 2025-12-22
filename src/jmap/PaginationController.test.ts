@@ -13,7 +13,7 @@ describe("PaginationController", () => {
     debug: false
   };
 
-  const summaries: Record<string, any> = {
+  const summaries: Record<string, { id: string; subject: string }> = {
     id0: { id: "id0", subject: "Test 0" },
     id1: { id: "id1", subject: "Test 1" },
     id2: { id: "id2", subject: "Test 2" },

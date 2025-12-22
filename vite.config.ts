@@ -34,9 +34,10 @@ async function fetchBimiLogoForDomain(domain: string, selector: string): Promise
       if (logoUrl) return logoUrl;
     }
     return null;
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Missing DNS record / domain is not an error for the UI; treat as "no BIMI".
-    if (err?.code === "ENOTFOUND" || err?.code === "ENODATA") return null;
+    const errObj = err as { code?: string };
+    if (errObj?.code === "ENOTFOUND" || errObj?.code === "ENODATA") return null;
     throw err;
   }
 }
@@ -47,7 +48,7 @@ function bimiDevApi() {
     apply: "serve",
     configureServer(server: { middlewares: { use: (fn: unknown) => void } }) {
       // Dev-only BIMI endpoint. In prod, `server.mjs` serves this.
-      server.middlewares.use(async (req: { url?: string }, res: any, next: () => void) => {
+      server.middlewares.use(async (req: { url?: string }, res: { statusCode: number; setHeader: (k: string, v: string) => void; end: (body: string) => void }, next: () => void) => {
         try {
           if (!req.url) return next();
           const url = new URL(req.url, "http://localhost");
@@ -77,9 +78,10 @@ function bimiDevApi() {
           res.setHeader("Content-Type", "application/json");
           res.setHeader("Cache-Control", "no-store");
           res.end(JSON.stringify({ logoUrl }));
-        } catch (err) {
+        } catch (err: unknown) {
           // Missing DNS record / domain is not an error for the UI; treat as "no BIMI".
-          if ((err as any)?.code === "ENOTFOUND" || (err as any)?.code === "ENODATA") {
+          const errObj = err as { code?: string };
+          if (errObj?.code === "ENOTFOUND" || errObj?.code === "ENODATA") {
             res.statusCode = 200;
             res.setHeader("Content-Type", "application/json");
             res.setHeader("Cache-Control", "no-store");

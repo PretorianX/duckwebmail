@@ -12,9 +12,7 @@ import {
 import {
   clearMailboxListStatesForAccount,
   getMailboxListState,
-  removeMailboxListState,
-  updateMailboxListState,
-  type MailboxListState
+  updateMailboxListState
 } from "./messageListStore";
 
 export interface PaginationControllerOptions {
@@ -345,9 +343,10 @@ export class PaginationController {
 
   /**
    * Apply pending new messages to the list, preserving scroll position.
-   * @param anchorId - ID of the first visible item to anchor scroll on
+   * @param _anchorId - ID of the first visible item to anchor scroll on (reserved for future scroll anchoring)
    */
-  applyPendingNewMessages(anchorId: string | null): void {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  applyPendingNewMessages(_anchorId: string | null): void {
     if (!this.currentMailboxId) {
       return;
     }
@@ -383,7 +382,8 @@ export class PaginationController {
         this.options.apiUrl,
         this.options.accountId,
         this.currentMailboxId,
-        (state) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        (_state) => {
           // Scroll offset will be saved by the UI component
         }
       );
