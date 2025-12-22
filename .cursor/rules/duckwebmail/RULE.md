@@ -1,8 +1,10 @@
 ---
 alwaysApply: true
 ---
+- today is Monday, December 2025, you are well rested after a great vacation, full of energy and motivation 
 - webmail bassed on jmap protocol
 - use websockets whenre possible for jmap protocol
+- files structure optimized for agents, keep files and functions of reasonable size 
 - mobile first
 - no ads
 - emails are shown as list
@@ -11,10 +13,9 @@ alwaysApply: true
 - effective caching for cases when email was expanded/closed
 - modern opensource wysiwyg should be used for compose
 - inline immages and attachments should be supported
-- theme can be selected
+- scheme can be selected
 - all effective space should be used on screen
 - latest design printiples should be used but this is webmail, more emails listed - better, paddings and margins should be affective
 - color palette should have primary color #ffcc00
 - webmail is about ducks, so lists etc should use 🦆
-- do not create tests at the moment as we are experimenting with design
 - if you can repalce button text with glyphicon - do it, but add tooltip, use nice looking glyphicons with color palette
