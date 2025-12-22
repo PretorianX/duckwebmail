@@ -38,6 +38,23 @@ function normalizeName(value: unknown, fallback: string): string {
   return n || fallback;
 }
 
+function guessExtension(contentType: string): string | null {
+  const t = contentType.toLowerCase();
+  if (t === "message/rfc822" || t === "application/rfc822") return "eml";
+  if (t === "application/pdf") return "pdf";
+  if (t === "application/zip") return "zip";
+  if (t === "application/json") return "json";
+  if (t === "text/plain") return "txt";
+  if (t === "text/html") return "html";
+  if (t.startsWith("image/")) return t.split("/")[1] || "img";
+  return null;
+}
+
+function shortId(value: string): string {
+  const s = value.trim();
+  return s.length <= 8 ? s : s.slice(0, 8);
+}
+
 function normalizeCid(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const cid = value.trim().replace(/^<|>$/g, "");
@@ -72,6 +89,7 @@ export function extractAttachmentsFromBodyStructure(bodyStructure: unknown | und
 } {
   const attachments: ExtractedAttachmentRef[] = [];
   const inlineImages: ExtractedAttachmentRef[] = [];
+  let emlCounter = 0;
 
   const walk = (p: BodyPart | undefined) => {
     if (!p) return;
@@ -97,8 +115,16 @@ export function extractAttachmentsFromBodyStructure(bodyStructure: unknown | und
     if (looksLikeBodyPart(p)) return;
 
     const sizeBytes = typeof p.size === "number" && Number.isFinite(p.size) ? Math.max(0, Math.trunc(p.size)) : 0;
-    const fallbackName = type.toLowerCase().startsWith("image/") ? "image" : "attachment";
-    const name = normalizeName(p.name, fallbackName);
+    const ext = guessExtension(type);
+    const base = type.toLowerCase().startsWith("image/") ? "image" : "attachment";
+    const fallbackName = ext ? `${base}-${shortId(blobId)}.${ext}` : `${base}-${shortId(blobId)}`;
+    const hasProvidedName = typeof p.name === "string" && p.name.trim() !== "";
+    const isRfc822 = type.toLowerCase() === "message/rfc822" || type.toLowerCase() === "application/rfc822";
+    const name = hasProvidedName
+      ? normalizeName(p.name, fallbackName)
+      : isRfc822
+        ? `eml-${(emlCounter += 1)}.eml`
+        : fallbackName;
 
     const entry: ExtractedAttachmentRef = {
       id: (typeof p.partId === "string" && p.partId.trim()) ? p.partId.trim() : cid ? `cid:${cid}` : blobId,
@@ -110,19 +136,14 @@ export function extractAttachmentsFromBodyStructure(bodyStructure: unknown | und
       ...(cid ? { cid } : {})
     };
 
-    if (disp === "inline" && (cid || type.toLowerCase().startsWith("image/"))) {
+    // Inline images: prefer explicit inline disposition or cid presence.
+    if ((disp === "inline" || !!cid) && (cid || type.toLowerCase().startsWith("image/"))) {
       inlineImages.push(entry);
       return;
     }
 
-    if (disp === "attachment") {
-      attachments.push(entry);
-      return;
-    }
-
-    // No disposition: treat named non-body parts as attachments.
-    const hasName = typeof p.name === "string" && p.name.trim() !== "";
-    if (hasName) attachments.push({ ...entry, disposition: "attachment" });
+    // Everything else: include as attachment so users can always download it.
+    attachments.push({ ...entry, disposition: "attachment" });
   };
 
   walk(bodyStructure as BodyPart | undefined);

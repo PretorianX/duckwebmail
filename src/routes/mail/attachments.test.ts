@@ -78,6 +78,41 @@ describe("extractAttachmentsFromBodyStructure", () => {
     expect(attachments).toEqual([]);
     expect(inlineImages).toEqual([]);
   });
+
+  it("includes leaf parts with blobId even if disposition/name are missing (download-only)", () => {
+    const bodyStructure = {
+      type: "multipart/mixed",
+      subParts: [
+        { partId: "1", type: "text/html" },
+        {
+          partId: "2",
+          blobId: "blob-unknown",
+          type: "application/octet-stream",
+          size: 10
+        }
+      ]
+    };
+
+    const { attachments, inlineImages } = extractAttachmentsFromBodyStructure(bodyStructure);
+    expect(inlineImages).toHaveLength(0);
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0]?.blobId).toBe("blob-unknown");
+    expect(attachments[0]?.name).toMatch(/^attachment-blob-unk/);
+  });
+
+  it("names unnamed rfc822 attachments as eml-<n>.eml", () => {
+    const bodyStructure = {
+      type: "multipart/mixed",
+      subParts: [
+        { partId: "1", type: "text/html" },
+        { partId: "2", blobId: "b1", type: "message/rfc822", size: 1 },
+        { partId: "3", blobId: "b2", type: "message/rfc822", size: 2 }
+      ]
+    };
+
+    const { attachments } = extractAttachmentsFromBodyStructure(bodyStructure);
+    expect(attachments.map((a) => a.name)).toEqual(["eml-1.eml", "eml-2.eml"]);
+  });
 });
 
 
