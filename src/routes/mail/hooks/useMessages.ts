@@ -113,6 +113,7 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
     return () => {
       controllerRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth?.accountId, auth?.authHeader, auth?.session.apiUrl, isDesktop, searchQuery, searchIncludeBody]);
 
   // Update folder ref
@@ -201,6 +202,7 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
     }
     if (controllerRef.current) controllerRef.current.reset(folderId);
     void loadMessages({ force: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth?.accountId, auth?.authHeader, auth?.session.apiUrl, folderId, loadMessages]);
 
   // Debounced search

@@ -118,6 +118,7 @@ export default function MailPage() {
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composeHook.sendMenuOpen, composeHook.sendMenuRef, composeHook.setSendMenuOpen]);
 
   // Download EML

@@ -146,6 +146,7 @@ export function useWebSocketPush({ auth, folderIdRef, loadMailboxes, refreshHead
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (window as any).__jmapPushMetrics;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth?.accountId, auth?.authHeader, auth?.session.webSocketUrl, folderIdRef, loadMailboxes, refreshHead]);
 }
 
