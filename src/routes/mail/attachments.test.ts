@@ -113,6 +113,45 @@ describe("extractAttachmentsFromBodyStructure", () => {
     const { attachments } = extractAttachmentsFromBodyStructure(bodyStructure);
     expect(attachments.map((a) => a.name)).toEqual(["eml-1.eml", "eml-2.eml"]);
   });
+
+  it("does not treat message/delivery-status as a separate attachment in DSN-like structures", () => {
+    const bodyStructure = {
+      type: "multipart/report",
+      subParts: [
+        { partId: "1", type: "text/plain" },
+        { partId: "2", blobId: "b-delivery", type: "message/delivery-status", size: 10 },
+        { partId: "3", blobId: "b-eml", type: "message/rfc822", size: 20 }
+      ]
+    };
+
+    const { attachments, inlineImages } = extractAttachmentsFromBodyStructure(bodyStructure);
+    expect(inlineImages).toHaveLength(0);
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0]?.blobId).toBe("b-eml");
+    expect(attachments[0]?.name).toBe("eml-1.eml");
+  });
+
+  it("treats message/rfc822 as opaque (does not duplicate inner blob parts)", () => {
+    const bodyStructure = {
+      type: "multipart/mixed",
+      subParts: [
+        { partId: "1", type: "text/html" },
+        {
+          partId: "2",
+          blobId: "b-eml",
+          type: "message/rfc822",
+          subParts: [
+            // If a server exposes inner parts with blobIds, we still want only the outer .eml attachment.
+            { partId: "2.1", blobId: "b-inner", type: "application/pdf", name: "inner.pdf", disposition: "attachment" }
+          ]
+        }
+      ]
+    };
+
+    const { attachments } = extractAttachmentsFromBodyStructure(bodyStructure);
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0]?.blobId).toBe("b-eml");
+  });
 });
 
 
