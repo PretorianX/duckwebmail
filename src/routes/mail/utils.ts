@@ -76,6 +76,7 @@ export function toMessage(email: JmapEmailSummary): Message {
     starred: isStarred(email.keywords),
     hasAttachments: !!email.hasAttachment,
     attachments: [],
+    inlineImages: [],
     blobId: (email.blobId ?? "").trim() ? String(email.blobId) : null
   };
 }

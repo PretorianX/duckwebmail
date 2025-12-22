@@ -26,11 +26,12 @@ import {
   MessageRow,
   ComposeModal,
   MessageActionsSheet,
+  AttachmentActionsSheet,
   FolderActionsSheet,
   FolderOperationModal
 } from "./mail/components";
 import { decodeBasicUsername, sanitizeFilename, buildJmapDownloadUrl, triggerBlobDownload } from "./mail/utils";
-import type { Message } from "./mail/types";
+import type { Attachment, Message } from "./mail/types";
 
 import styles from "./mail.module.css";
 
@@ -57,6 +58,9 @@ export default function MailPage() {
   // UI State
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
   const [emailCopied, setEmailCopied] = useState(false);
+  const [activeAttachment, setActiveAttachment] = useState<Attachment | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<{ url: string; name: string } | null>(null);
+  const previewObjectUrlRef = useRef<string | null>(null);
 
   // Virtual list refs
   const virtualListRef = useRef<VariableSizeList | null>(null);
@@ -143,6 +147,41 @@ export default function MailPage() {
     } catch (e) {
       console.error("[EmlDownload] failed:", e);
       globalThis.alert(t("mail.downloadEmlFailed"));
+    }
+  };
+
+  const previewAttachment = async (a: Attachment) => {
+    try {
+      const { blob, filename } = await messageHook.fetchAttachmentBlob(a);
+      const objectUrl = URL.createObjectURL(blob);
+
+      // Image preview in-app; everything else in a new tab.
+      if ((a.contentType || "").toLowerCase().startsWith("image/")) {
+        if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current);
+        previewObjectUrlRef.current = objectUrl;
+        setAttachmentPreview({ url: objectUrl, name: filename });
+        return;
+      }
+
+      const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
+      // If blocked, be explicit rather than silently doing something else.
+      if (!opened) globalThis.alert(t("mail.previewBlocked"));
+
+      // Give the new tab time to load the blob URL before revoking.
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (e) {
+      console.error("[AttachmentPreview] failed:", e);
+      globalThis.alert(t("mail.attachmentPreviewFailed"));
+    }
+  };
+
+  const downloadAttachment = async (a: Attachment) => {
+    try {
+      const { blob, filename } = await messageHook.fetchAttachmentBlob(a);
+      triggerBlobDownload(filename, blob);
+    } catch (e) {
+      console.error("[AttachmentDownload] failed:", e);
+      globalThis.alert(t("mail.downloadAttachmentFailed"));
     }
   };
 
@@ -447,6 +486,7 @@ export default function MailPage() {
                         folderIdRef={messageHook.folderIdRef}
                         onToggleExpanded={messageHook.toggleExpanded}
                         onToggleAttachments={messageHook.toggleAttachments}
+                        onAttachmentAction={(a) => setActiveAttachment(a)}
                         onToggleToIds={(id) => {
                           messageHook.setExpandedToIds((prev) => {
                             const next = new Set(prev);
@@ -523,6 +563,54 @@ export default function MailPage() {
           onDelete={messageHook.deleteMessage}
           onDownloadEml={downloadEml}
         />
+      )}
+
+      {/* Attachment Actions Sheet */}
+      {activeAttachment && (
+        <AttachmentActionsSheet
+          attachment={activeAttachment}
+          onClose={() => setActiveAttachment(null)}
+          onPreview={(a) => void previewAttachment(a)}
+          onDownload={(a) => void downloadAttachment(a)}
+        />
+      )}
+
+      {/* Attachment Preview Modal (images) */}
+      {attachmentPreview && (
+        <div
+          className={styles.modalOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("mail.preview")}
+          onMouseDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current);
+            previewObjectUrlRef.current = null;
+            setAttachmentPreview(null);
+          }}
+        >
+          <div className={styles.modal} role="document">
+            <div className={styles.modalHeader}>
+              <div className={styles.modalTitle}>{attachmentPreview.name}</div>
+              <button
+                type="button"
+                className={styles.modalClose}
+                aria-label={t("common.close")}
+                title={t("common.close")}
+                onClick={() => {
+                  if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current);
+                  previewObjectUrlRef.current = null;
+                  setAttachmentPreview(null);
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody} style={{ padding: 0 }}>
+              <img src={attachmentPreview.url} alt={attachmentPreview.name} style={{ width: "100%", height: "auto", display: "block" }} />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Folder Actions Sheet */}

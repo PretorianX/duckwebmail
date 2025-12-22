@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   ChevronRight,
-  Download,
   LoaderCircle,
   MoreHorizontal,
   Paperclip
@@ -11,8 +10,8 @@ import {
 import { formatSenderForList } from "../../../jmap/email";
 import { normalizeBimiDomainKey } from "../../../jmap/bimi";
 import SafeEmailViewer from "../../../shared/SafeEmailViewer";
-import type { Message } from "../types";
-import { formatListArrivalTime, getBimiInitial, formatBytes, triggerDownload } from "../utils";
+import type { Attachment, Message } from "../types";
+import { formatListArrivalTime, getBimiInitial, formatBytes } from "../utils";
 import styles from "../../mail.module.css";
 
 type MessageRowProps = {
@@ -30,6 +29,7 @@ type MessageRowProps = {
   onToggleAttachments: (id: string) => void;
   onToggleToIds: (id: string) => void;
   onRowActionsClick: (id: string) => void;
+  onAttachmentAction: (attachment: Attachment) => void;
   onDragStart: (emailId: string, fromFolderId: string) => void;
   onDragEnd: () => void;
 };
@@ -49,11 +49,13 @@ export function MessageRow({
   onToggleAttachments,
   onToggleToIds,
   onRowActionsClick,
+  onAttachmentAction,
   onDragStart,
   onDragEnd
 }: MessageRowProps) {
   const { t } = useTranslation();
   const regionId = `message-body-${msg.id}`;
+  const attachmentCount = (msg.attachments?.length ?? 0) + (msg.inlineImages?.length ?? 0);
 
   const senderEmail = msg.fromRaw?.[0]?.email;
   const domain = senderEmail ? normalizeBimiDomainKey(senderEmail) : null;
@@ -177,7 +179,7 @@ export function MessageRow({
             {expandedToIds.has(msg.id) ? msg.to : activeProfileName}
           </button>
           <div className={styles.downloadRow}>
-            {msg.attachments.length > 0 && (
+            {attachmentCount > 0 && (
               <button
                 type="button"
                 className={styles.attachmentsToggle}
@@ -189,7 +191,7 @@ export function MessageRow({
               >
                 <Paperclip className={styles.icon} aria-hidden="true" />
                 <span className={styles.attachmentsToggleLabel}>{t("mail.attachments")}</span>
-                <span className={styles.attachmentsToggleCount}>{msg.attachments.length}</span>
+                <span className={styles.attachmentsToggleCount}>{attachmentCount}</span>
                 {expandedAttachmentIds.has(msg.id) ? (
                   <ChevronDown className={`${styles.icon} ${styles.attachmentsToggleChevron}`} aria-hidden="true" />
                 ) : (
@@ -200,29 +202,50 @@ export function MessageRow({
           </div>
         </div>
 
-        {msg.attachments.length > 0 && (
+        {attachmentCount > 0 && (
           <div
             id={`attachments-${msg.id}`}
             className={styles.attachments}
             aria-label={t("mail.attachments")}
             hidden={!expandedAttachmentIds.has(msg.id)}
           >
-            {msg.attachments.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                className={styles.attachmentChip}
-                title={t("mail.downloadAttachment")}
-                aria-label={t("mail.downloadAttachmentName", { name: a.name })}
-                onClick={() => triggerDownload(a.name, a.contentType, a.content)}
-              >
-                <span className={styles.attachmentName}>{a.name}</span>
-                <span className={styles.attachmentSize}>{formatBytes(a.sizeBytes)}</span>
-                <span className={styles.attachmentIcon} aria-hidden="true">
-                  <Download className={styles.icon} aria-hidden="true" />
-                </span>
-              </button>
-            ))}
+            {msg.attachments.length > 0 && (
+              <>
+                <div className={styles.attachmentSectionTitle}>{t("mail.attachments")}</div>
+                {msg.attachments.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    className={styles.attachmentChip}
+                    title={t("mail.attachmentActions")}
+                    aria-label={t("mail.attachmentActionsName", { name: a.name })}
+                    onClick={() => onAttachmentAction(a)}
+                  >
+                    <span className={styles.attachmentName}>{a.name}</span>
+                    <span className={styles.attachmentSize}>{formatBytes(a.sizeBytes)}</span>
+                  </button>
+                ))}
+              </>
+            )}
+
+            {msg.inlineImages.length > 0 && (
+              <>
+                <div className={styles.attachmentSectionTitle}>{t("mail.inlineImages")}</div>
+                {msg.inlineImages.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    className={styles.attachmentChip}
+                    title={t("mail.attachmentActions")}
+                    aria-label={t("mail.attachmentActionsName", { name: a.name })}
+                    onClick={() => onAttachmentAction(a)}
+                  >
+                    <span className={styles.attachmentName}>{a.name}</span>
+                    <span className={styles.attachmentSize}>{formatBytes(a.sizeBytes)}</span>
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         )}
 

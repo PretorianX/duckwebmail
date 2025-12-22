@@ -1135,6 +1135,15 @@
   gap: 8px;
 }
 
+.attachmentSectionTitle {
+  width: 100%;
+  font-size: 0.82rem;
+  font-weight: 950;
+  letter-spacing: 0.2px;
+  color: var(--light-text);
+  padding: 4px 2px 0;
+}
+
 .attachmentChip {
   max-width: 100%;
   border: 1px solid var(--border-color);
@@ -1171,6 +1180,43 @@
 .attachmentIcon {
   color: var(--light-text);
   display: inline-flex;
+}
+
+.attachmentSheetMeta {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: rgba(255, 204, 0, 0.06);
+}
+
+.attachmentSheetNameRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.attachmentSheetName {
+  font-weight: 950;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachmentSheetSub {
+  color: var(--light-text);
+  font-size: 0.82rem;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.attachmentSheetDot {
+  opacity: 0.75;
 }
 
 .metaLabel {

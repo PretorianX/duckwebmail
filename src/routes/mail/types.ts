@@ -9,10 +9,12 @@ export type Folder = {
 
 export type Attachment = {
   id: string;
+  blobId: string;
   name: string;
   sizeBytes: number;
   contentType: string;
-  content: string;
+  disposition: "attachment" | "inline";
+  cid?: string;
 };
 
 export type Message = {
@@ -27,6 +29,7 @@ export type Message = {
   starred: boolean;
   hasAttachments: boolean;
   attachments: Attachment[];
+  inlineImages: Attachment[];
   blobId: string | null;
   html?: string;
   text?: string;

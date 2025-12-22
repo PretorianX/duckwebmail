@@ -13,8 +13,9 @@ import {
 import { PaginationController } from "../../../jmap/PaginationController";
 import { fetchBimiLogo, normalizeBimiDomainKey } from "../../../jmap/bimi";
 import type { JmapSession } from "../../../jmap/normalizeSession";
-import type { Message } from "../types";
-import { toMessage, buildJmapDownloadUrl } from "../utils";
+import type { Attachment, Message } from "../types";
+import { toMessage, buildJmapDownloadUrl, sanitizeFilename } from "../utils";
+import { extractAttachmentsFromBodyStructure } from "../attachments";
 
 type Auth = {
   session: JmapSession;
@@ -40,6 +41,19 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
   const [rowActionsMessageId, setRowActionsMessageId] = useState<string | null>(null);
   const [bimiLogos, setBimiLogos] = useState<Map<string, string | null>>(new Map());
   const [messageBodies, setMessageBodies] = useState<Map<string, { html?: string; text?: string }>>(new Map());
+  const [messageAttachments, setMessageAttachments] = useState<Map<string, { attachments: Attachment[]; inlineImages: Attachment[] }>>(
+    () => new Map()
+  );
+  const messageBodiesRef = useRef(messageBodies);
+  const messageAttachmentsRef = useRef(messageAttachments);
+
+  useEffect(() => {
+    messageBodiesRef.current = messageBodies;
+  }, [messageBodies]);
+
+  useEffect(() => {
+    messageAttachmentsRef.current = messageAttachments;
+  }, [messageAttachments]);
 
   // Email drag state
   const [draggingEmailId, setDraggingEmailId] = useState<string | null>(null);
@@ -65,14 +79,19 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
       const item = controllerState.itemsById.get(id);
       if (!item) return null;
       const body = messageBodies.get(id);
+      const extracted = messageAttachments.get(id);
       const msg = toMessage(item);
       if (body) {
         msg.html = body.html;
         msg.text = body.text;
       }
+      if (extracted) {
+        msg.attachments = extracted.attachments;
+        msg.inlineImages = extracted.inlineImages;
+      }
       return msg;
     }).filter((m): m is Message => m !== null);
-  }, [controllerState, messageBodies]);
+  }, [controllerState, messageBodies, messageAttachments]);
 
   const messagesLoading = controllerState?.loading ?? false;
   const messagesError = controllerState?.error ?? null;
@@ -83,13 +102,18 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
     const item = controllerState.itemsById.get(rowActionsMessageId);
     if (!item) return null;
     const body = messageBodies.get(rowActionsMessageId);
+    const extracted = messageAttachments.get(rowActionsMessageId);
     const msg = toMessage(item);
     if (body) {
       msg.html = body.html;
       msg.text = body.text;
     }
+    if (extracted) {
+      msg.attachments = extracted.attachments;
+      msg.inlineImages = extracted.inlineImages;
+    }
     return msg;
-  }, [controllerState, rowActionsMessageId, messageBodies]);
+  }, [controllerState, rowActionsMessageId, messageBodies, messageAttachments]);
 
   // Initialize controller when auth changes
   useEffect(() => {
@@ -185,6 +209,7 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
     setExpandedToIds(new Set());
     setDraggingEmailId(null);
     setDraggingEmailFromFolderId(null);
+    setMessageAttachments(new Map());
   }, [folderId]);
 
   // Load messages when folder changes
@@ -307,6 +332,7 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
   const toggleExpanded = useCallback((messageId: string) => {
     const ensureBodyLoaded = async (targetMessageId: string) => {
       if (!auth) return;
+      if (messageBodiesRef.current.has(targetMessageId) && messageAttachmentsRef.current.has(targetMessageId)) return;
       setBodyErrors((prev) => {
         if (!prev[targetMessageId]) return prev;
         const next = { ...prev };
@@ -330,9 +356,16 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
         const resolved = body.html
           ? await resolveCidImagesToObjectUrls(body.html, body.bodyStructure)
           : { html: body.html ?? "", objectUrls: [] };
+
+        const extracted = extractAttachmentsFromBodyStructure(body.bodyStructure);
         setMessageBodies((prev) => {
           const next = new Map(prev);
           next.set(targetMessageId, { html: resolved.html || undefined, text: body.text });
+          return next;
+        });
+        setMessageAttachments((prev) => {
+          const next = new Map(prev);
+          next.set(targetMessageId, extracted);
           return next;
         });
       } catch (err) {
@@ -496,6 +529,20 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
     void run();
   }, [auth, loadMailboxes, syncControllerState]);
 
+  const fetchAttachmentBlob = useCallback(async (a: Attachment): Promise<{ blob: Blob; filename: string }> => {
+    if (!auth) throw new Error("Not authenticated");
+    const filename = sanitizeFilename(a.name || "attachment");
+    const url = buildJmapDownloadUrl(auth.session.downloadUrl, {
+      accountId: auth.accountId,
+      blobId: a.blobId,
+      name: filename,
+      type: a.contentType || "application/octet-stream"
+    });
+    const res = await fetch(url, { method: "GET", headers: { Authorization: auth.authHeader } });
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    return { blob: await res.blob(), filename };
+  }, [auth]);
+
   const deleteMessage = useCallback((messageId: string) => {
     const run = async () => {
       if (!auth) return;
@@ -510,6 +557,12 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
       syncControllerState();
       setExpandedMessageIds((prev) => {
         const next = new Set(prev);
+        next.delete(messageId);
+        return next;
+      });
+      setMessageAttachments((prev) => {
+        if (!prev.has(messageId)) return prev;
+        const next = new Map(prev);
         next.delete(messageId);
         return next;
       });
@@ -563,6 +616,12 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
         });
         setExpandedToIds((prev) => {
           const next = new Set(prev);
+          next.delete(params.emailId);
+          return next;
+        });
+        setMessageAttachments((prev) => {
+          if (!prev.has(params.emailId)) return prev;
+          const next = new Map(prev);
           next.delete(params.emailId);
           return next;
         });
@@ -626,6 +685,7 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
     toggleUnread,
     deleteMessage,
     performMoveEmail,
+    fetchAttachmentBlob,
     loadNextPage,
     applyPendingNewMessages,
     refreshHead,
