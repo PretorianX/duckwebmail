@@ -1,3 +1,4 @@
+import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
@@ -15,7 +16,7 @@ type ComposeModalProps = {
   isDesktop: boolean;
   activeProfileName: string;
   composeDraft: ComposeDraft;
-  setComposeDraft: React.Dispatch<React.SetStateAction<ComposeDraft>>;
+  setComposeDraft: Dispatch<SetStateAction<ComposeDraft>>;
   composeError: string | null;
   composeBusy: boolean;
   composeShowCc: boolean;
@@ -29,11 +30,11 @@ type ComposeModalProps = {
   sendMenuOpen: boolean;
   setSendMenuOpen: (open: boolean) => void;
   attachments: File[];
-  setAttachments: React.Dispatch<React.SetStateAction<File[]>>;
-  setInlineImagesByCid: React.Dispatch<React.SetStateAction<Record<string, File>>>;
-  sendMenuRef: React.RefObject<HTMLDivElement | null>;
-  attachmentsInputRef: React.RefObject<HTMLInputElement | null>;
-  scheduledForInputRef: React.RefObject<HTMLInputElement | null>;
+  setAttachments: Dispatch<SetStateAction<File[]>>;
+  setInlineImagesByCid: Dispatch<SetStateAction<Record<string, File>>>;
+  sendMenuRef: RefObject<HTMLDivElement | null>;
+  attachmentsInputRef: RefObject<HTMLInputElement | null>;
+  scheduledForInputRef: RefObject<HTMLInputElement | null>;
   isComposeDirty: boolean;
   onMinimize: () => void;
   onDiscard: () => void;
@@ -198,7 +199,7 @@ export function ComposeModal({
             <label className={styles.field}>
               {t("mail.scheduledFor")}
               <input
-                ref={scheduledForInputRef as React.RefObject<HTMLInputElement>}
+                ref={scheduledForInputRef as RefObject<HTMLInputElement>}
                 className={`${styles.input} ${styles.datetimeInput}`}
                 type="datetime-local"
                 value={scheduledFor}
@@ -219,7 +220,7 @@ export function ComposeModal({
           </div>
 
           <input
-            ref={attachmentsInputRef as React.RefObject<HTMLInputElement>}
+            ref={attachmentsInputRef as RefObject<HTMLInputElement>}
             className={styles.attachmentsInput}
             type="file"
             multiple
@@ -283,7 +284,7 @@ export function ComposeModal({
           </div>
 
           <div className={styles.modalFooterRight}>
-            <div ref={sendMenuRef as React.RefObject<HTMLDivElement>} className={styles.splitButton}>
+            <div ref={sendMenuRef as RefObject<HTMLDivElement>} className={styles.splitButton}>
               <button
                 className={styles.primaryButton}
                 type="button"

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import { clearEmailListCacheForAccount } from "../../../jmap/email";
 import { JmapPushClient, stateChangeAffectsAccount, type StateChange } from "../../../jmap/webSocketPush";
 
@@ -10,7 +10,7 @@ type Auth = {
 
 type UseWebSocketPushParams = {
   auth: Auth;
-  folderIdRef: React.MutableRefObject<string>;
+  folderIdRef: MutableRefObject<string>;
   loadMailboxes: (opts?: { force?: boolean }) => Promise<void>;
   refreshHead: () => Promise<void>;
 };

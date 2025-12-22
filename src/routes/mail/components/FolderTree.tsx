@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MutableRefObject, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
@@ -33,7 +33,7 @@ type FolderTreeProps = {
   performMoveEmail: (params: { emailId: string; fromFolderId: string; toFolderId: string }) => Promise<void>;
   setFolderActionsFolderId: (id: string | null) => void;
   setFolderPickerOpen?: (open: boolean) => void;
-  folderIdRef: React.MutableRefObject<string>;
+  folderIdRef: MutableRefObject<string>;
 };
 
 export function FolderTree({

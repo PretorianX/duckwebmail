@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { createMailbox, deleteMailbox, moveMailbox, renameMailbox, type JmapMailbox } from "../../../jmap/mailbox";
-import type { Folder, FolderIndex } from "../types";
+import type { FolderIndex } from "../types";
 
 type Auth = {
   session: { apiUrl: string };
@@ -14,7 +14,7 @@ type UseFolderOperationsParams = {
   folderIndex: FolderIndex;
   mailboxById: Map<string, JmapMailbox>;
   setFolderId: (id: string) => void;
-  setOpenFolderIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  setOpenFolderIds: Dispatch<SetStateAction<Set<string>>>;
   loadMailboxes: (opts?: { force?: boolean }) => Promise<void>;
 };
 
