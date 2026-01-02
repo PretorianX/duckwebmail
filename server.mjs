@@ -30,6 +30,23 @@ function setCommonHeaders(res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
 }
 
+function injectDeployEnvIntoHtml(html) {
+  // Runtime config for production images (where Vite build-time env is already baked).
+  // Kept intentionally small and explicit.
+  const env = {
+    VITE_DEFAULT_THEME: process.env.VITE_DEFAULT_THEME,
+    VITE_DEFAULT_SCHEME: process.env.VITE_DEFAULT_SCHEME,
+    VITE_LOGIN_BRANDING: process.env.VITE_LOGIN_BRANDING,
+    VITE_LOGIN_TAGLINE: process.env.VITE_LOGIN_TAGLINE
+  };
+
+  const script = `<script>window.__DUCKWEBMAIL_ENV__=${JSON.stringify(env)};</script>`;
+
+  // Prefer injecting into <head> (before app boot). If not found, prepend.
+  if (html.includes("</head>")) return html.replace("</head>", `${script}</head>`);
+  return `${script}\n${html}`;
+}
+
 function isWithinDir(filePath, dirPath) {
   const rel = path.relative(dirPath, filePath);
   return rel && !rel.startsWith("..") && !path.isAbsolute(rel);
@@ -192,7 +209,11 @@ const server = http.createServer(async (req, res) => {
       res.setHeader("Cache-Control", "no-cache");
     }
 
-    const body = await readFile(targetPath);
+    let body = await readFile(targetPath);
+    if (ext === ".html" && targetPath === INDEX_PATH) {
+      const html = body.toString("utf-8");
+      body = Buffer.from(injectDeployEnvIntoHtml(html), "utf-8");
+    }
     res.statusCode = 200;
     res.end(body);
   } catch {

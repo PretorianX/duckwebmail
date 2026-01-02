@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { DEFAULT_THEME_SCHEME, isThemeSchemeId, type ThemeSchemeId } from "./schemes";
+import { getDeployEnv } from "../config/deployEnv";
 
 type Theme = "light" | "dark";
 type ThemePreference = Theme | "system";
@@ -27,13 +28,13 @@ const STORAGE_THEME = "duckwebmail:theme";
 const STORAGE_SCHEME = "duckwebmail:themeScheme";
 
 function envDefaultTheme(): Theme | "system" | null {
-  const raw = import.meta.env.VITE_DEFAULT_THEME as unknown;
+  const raw = getDeployEnv("VITE_DEFAULT_THEME") as unknown;
   if (raw === "light" || raw === "dark" || raw === "system") return raw;
   return null;
 }
 
 function envDefaultScheme(): ThemeSchemeId | null {
-  const raw = import.meta.env.VITE_DEFAULT_SCHEME as unknown;
+  const raw = getDeployEnv("VITE_DEFAULT_SCHEME") as unknown;
   return isThemeSchemeId(raw) ? raw : null;
 }
 

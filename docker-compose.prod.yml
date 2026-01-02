@@ -4,6 +4,13 @@ services:
     environment:
       PORT: "8002"
       TZ: ${TZ:-UTC}
+      # Deployment defaults (user can override via localStorage later).
+      # Allowed VITE_DEFAULT_THEME: light | dark | system
+      # Allowed VITE_DEFAULT_SCHEME: duck | pure-email | paper | mono | duck2
+      VITE_DEFAULT_THEME: ${VITE_DEFAULT_THEME:-system}
+      VITE_DEFAULT_SCHEME: ${VITE_DEFAULT_SCHEME:-duck2}
+      VITE_LOGIN_BRANDING: ${VITE_LOGIN_BRANDING:-DuckWebmail}
+      VITE_LOGIN_TAGLINE: ${VITE_LOGIN_TAGLINE:-A lightweight webmail client for JMAP servers.}
     expose:
       - "8002"
     # Host nginx is already installed on the server. Bind UI to localhost only.

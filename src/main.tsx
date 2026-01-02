@@ -8,8 +8,9 @@ import { LanguageProvider } from "./i18n/LanguageContext";
 import { TimezoneProvider } from "./time/TimezoneContext";
 import { ThemeProvider } from "./theme/ThemeContext";
 import GlobalStyle from "./theme/GlobalStyle";
+import { getDeployEnv } from "./config/deployEnv";
 
-const branding = (import.meta.env.VITE_LOGIN_BRANDING as string | undefined)?.trim();
+const branding = getDeployEnv("VITE_LOGIN_BRANDING")?.trim();
 if (branding) document.title = branding;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

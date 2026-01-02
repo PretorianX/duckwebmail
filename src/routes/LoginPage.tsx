@@ -7,6 +7,7 @@ import { isAuthError, useAuth } from "../auth/AuthContext";
 import ThemeToggle from "../theme/ThemeToggle";
 import ProfileMenu from "../shared/ProfileMenu";
 import { useMediaQuery } from "../shared/useMediaQuery";
+import { getDeployEnv } from "../config/deployEnv";
 import styles from "./login.module.css";
 
 function toUserFacingLoginError(err: unknown, t: (key: string, options?: Record<string, unknown>) => string): { message: string; focusPassword: boolean } {
@@ -31,9 +32,9 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { signIn, activeProfile, activeAuth, profiles, authByProfile, setActiveProfileId } = useAuth();
   const isMobile = useMediaQuery("(max-width: 880px)");
-  const branding = (import.meta.env.VITE_LOGIN_BRANDING as string | undefined)?.trim();
+  const branding = getDeployEnv("VITE_LOGIN_BRANDING")?.trim();
   const brandingText = branding ? branding : t("login.brandingDefault");
-  const tagline = (import.meta.env.VITE_LOGIN_TAGLINE as string | undefined)?.trim();
+  const tagline = getDeployEnv("VITE_LOGIN_TAGLINE")?.trim();
   const taglineText = tagline ? tagline : t("login.taglineDefault");
 
   const [loading, setLoading] = useState(false);

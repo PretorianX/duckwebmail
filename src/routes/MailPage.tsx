@@ -32,10 +32,11 @@ import {
 } from "./mail/components";
 import { decodeBasicUsername, sanitizeFilename, buildJmapDownloadUrl, triggerBlobDownload } from "./mail/utils";
 import type { Attachment, Message } from "./mail/types";
+import { getDeployEnv } from "../config/deployEnv";
 
 import styles from "./mail.module.css";
 
-const branding = (import.meta.env.VITE_LOGIN_BRANDING as string | undefined)?.trim() || "Duckmail";
+const branding = getDeployEnv("VITE_LOGIN_BRANDING")?.trim() || "Duckmail";
 
 export default function MailPage() {
   const { t } = useTranslation();
