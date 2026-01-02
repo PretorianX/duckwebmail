@@ -31,17 +31,21 @@ function setCommonHeaders(res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
 }
 
-function injectDeployEnvIntoHtml(html) {
-  // Runtime config for production images (where Vite build-time env is already baked).
-  // Kept intentionally small and explicit.
-  const env = {
+function buildDeployEnvPayload() {
+  return {
     VITE_DEFAULT_THEME: process.env.VITE_DEFAULT_THEME,
     VITE_DEFAULT_SCHEME: process.env.VITE_DEFAULT_SCHEME,
     VITE_LOGIN_BRANDING: process.env.VITE_LOGIN_BRANDING,
     VITE_LOGIN_TAGLINE: process.env.VITE_LOGIN_TAGLINE
   };
+}
 
-  const script = `<script>window.__DUCKWEBMAIL_ENV__=${JSON.stringify(env)};</script>`;
+function injectDeployEnvIntoHtml(html) {
+  // Runtime config for production images (where Vite build-time env is already baked).
+  //
+  // IMPORTANT: nginx CSP in this repo uses `script-src 'self'`, which blocks inline scripts.
+  // So we inject a same-origin external script that sets `window.__DUCKWEBMAIL_ENV__`.
+  const script = `<script src="/__duckwebmail/env.js"></script>`;
 
   // Prefer injecting into <head> (before app boot). If not found, prepend.
   if (html.includes("</head>")) return html.replace("</head>", `${script}</head>`);
@@ -172,6 +176,16 @@ const server = http.createServer(async (req, res) => {
     }
 
     const url = new URL(req.url, "http://localhost");
+
+    // Runtime env endpoint used by the SPA (must be same-origin for CSP `script-src 'self'`).
+    if (url.pathname === "/__duckwebmail/env.js") {
+      const env = buildDeployEnvPayload();
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache");
+      res.end(`window.__DUCKWEBMAIL_ENV__=${JSON.stringify(env)};`);
+      return;
+    }
     
     // Handle BIMI API endpoint
     if (url.pathname === "/api/bimi") {
