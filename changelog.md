@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Mark sent emails as read (set JMAP `$seen` keyword) when moving Drafts → Sent after `EmailSubmission/set`.
 - Update production deployment to run behind host-managed nginx/certbot (remove them from `docker-compose.prod.yml`), publish localhost-only ports for the UI and Stalwart JMAP, switch Stalwart prod to use vendor image (like dev), mount certbot-managed TLS into Stalwart, add host nginx configs for `webmail.mail-duck.com` + `mail.mailduck.systems` including an HTTP-only bootstrap config for initial cert generation, and make prod `VITE_*` defaults configurable at runtime via env injection in `server.mjs`.
 - Implement incremental JMAP pagination with virtualized message list: add `PaginationController` for cursor-based windowed loading (`Email/query` with `position`/`limit`), mailbox-scoped state store with LRU cache, `react-window` `VariableSizeList` for efficient rendering of large folders (200+ messages), infinite scroll with "Load more" fallback, "New messages" pill that applies pending changes without scroll jump, and `Email/queryChanges` integration (with head requery fallback) for consistency when new mail arrives. Fixes "only first chunk exists" bug and enables smooth browsing of large folders.
 - Restore attachment management in message accordion: derive attachments/inline images from JMAP `bodyStructure` on-demand (cached per message), add attachment actions sheet (Preview/Download) for mobile/desktop, and switch to binary-safe authenticated blob downloads via JMAP `downloadUrl`.

@@ -495,7 +495,9 @@ export async function sendEmailSubmission(params: {
           [`#${createId}`]: {
             [`mailboxIds/${params.draftsMailboxId}`]: null,
             [`mailboxIds/${params.sentMailboxId}`]: true,
-            "keywords/$draft": null
+            "keywords/$draft": null,
+            // Sent items should be treated as "read" (seen) by default.
+            "keywords/$seen": true
           }
         }
       },
