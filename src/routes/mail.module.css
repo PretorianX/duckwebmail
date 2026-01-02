@@ -681,6 +681,47 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.messageListContent {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  transition: filter 160ms ease, opacity 160ms ease;
+}
+
+.messageListContentBlurred {
+  filter: blur(3px) saturate(0.95);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.messageListOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(18, 22, 32, 0.06);
+  backdrop-filter: blur(6px);
+}
+
+.messageListOverlayCard {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+  font-weight: 950;
+  color: var(--text-color);
+}
+
+.messageListOverlayDuck {
+  opacity: 0.95;
+}
+
 .appFooter {
   margin-top: auto;
   display: flex;

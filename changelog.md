@@ -46,3 +46,4 @@
 - Fix WebSocket URL extraction from Stalwart session (URL is in `capabilities["urn:ietf:params:jmap:websocket"].url`, not top-level).
 - Mark emails as read when expanded (`Email/set` with `$seen` keyword) and update folder unread counts.
 - Fix stale email list on folder switch by forcing refresh and clearing cache on `StateChange`.
+- Add a folder-switch loader overlay: keep the current email list visible but blurred with a centered spinner while the new folder’s messages load.

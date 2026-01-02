@@ -7,6 +7,7 @@ import { vi } from "vitest";
 import MailPage from "./MailPage";
 import { ThemeProvider } from "../theme/ThemeContext";
 import { LanguageProvider } from "../i18n/LanguageContext";
+import { emailQueryWindow } from "../jmap/email";
 
 // Virtualization makes DOM assertions brittle in unit tests; mock react-window to render all items.
 vi.mock("react-window", () => ({
@@ -267,6 +268,37 @@ describe("MailPage", () => {
     await user.hover(welcomeRow);
     await user.click(within(welcomeRow).getByRole("button", { name: /more actions welcome/i }));
     expect(screen.getByRole("button", { name: /download source/i })).toBeInTheDocument();
+  });
+
+  test("shows blur+loader overlay while switching folders", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderMailPage();
+
+    // Wait for initial list to render.
+    await screen.findByRole("button", { name: /open welcome/i });
+
+    // Make the next folder query slow so we can observe the overlay.
+    let resolveQuery: ((value: { ids: string[]; queryState: string; total: number; canCalculateChanges: boolean }) => void) | null = null;
+    const deferred = new Promise<{ ids: string[]; queryState: string; total: number; canCalculateChanges: boolean }>((resolve) => {
+      resolveQuery = resolve;
+    });
+
+    vi.mocked(emailQueryWindow).mockImplementationOnce(async () => deferred);
+
+    // Switch folder.
+    const archive = await screen.findByRole("treeitem", { name: /archive/i });
+    await user.click(archive);
+
+    // Overlay should appear immediately (while query is pending).
+    expect(screen.getByText(/loading emails/i)).toBeInTheDocument();
+
+    // Resolve query; overlay should disappear.
+    resolveQuery?.({ ids: ["m1", "m2"], queryState: "q2", total: 2, canCalculateChanges: true });
+    expect(resolveQuery).not.toBeNull();
+
+    // Wait until the overlay text is gone.
+    await screen.findByRole("button", { name: /open welcome/i });
+    expect(screen.queryByText(/loading emails/i)).not.toBeInTheDocument();
   });
 });
 

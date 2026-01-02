@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { VariableSizeList } from "react-window";
 import {
   ChevronDown,
@@ -112,6 +112,31 @@ export default function MailPage() {
     setFolderPickerOpen(false);
   }, [mailboxHook.folderId]);
 
+  // Folder-switch loader overlay (keep existing list visible, but blurred, until the new folder finishes loading)
+  const [folderSwitching, setFolderSwitching] = useState(false);
+  const folderSwitchTargetIdRef = useRef<string | null>(null);
+
+  const setFolderIdWithOverlay = useCallback((id: string) => {
+    if (!id) return;
+    if (id === mailboxHook.folderId) return;
+    folderSwitchTargetIdRef.current = id;
+    setFolderSwitching(true);
+    mailboxHook.setFolderId(id);
+  }, [mailboxHook]);
+
+  useEffect(() => {
+    if (!folderSwitching) return;
+    const targetId = folderSwitchTargetIdRef.current;
+    const state = messageHook.controllerState;
+    if (!targetId) return;
+    if (!state) return;
+    if (state.mailboxId !== targetId) return;
+    if (state.loading) return;
+    // Loaded (or errored) for the target folder → remove blur + overlay.
+    setFolderSwitching(false);
+    folderSwitchTargetIdRef.current = null;
+  }, [folderSwitching, messageHook.controllerState]);
+
   // Close send menu on outside click
   useEffect(() => {
     if (!composeHook.sendMenuOpen) return;
@@ -187,6 +212,7 @@ export default function MailPage() {
   };
 
   const { messages, controllerState } = messageHook;
+  const showFolderSwitchOverlay = folderSwitching && !!folderSwitchTargetIdRef.current;
 
   return (
     <main className={styles.shell}>
@@ -277,7 +303,7 @@ export default function MailPage() {
               folderIndex={mailboxHook.folderIndex}
               mailboxById={mailboxHook.mailboxById}
               folderId={mailboxHook.folderId}
-              setFolderId={mailboxHook.setFolderId}
+              setFolderId={setFolderIdWithOverlay}
               effectiveOpenFolderIds={mailboxHook.effectiveOpenFolderIds}
               visibleFolderIds={mailboxHook.visibleFolderIds}
               toggleFolderOpen={mailboxHook.toggleFolderOpen}
@@ -339,6 +365,7 @@ export default function MailPage() {
           aria-label={t("mail.messageList")}
           style={{ position: "relative", height: "100%", overflow: "hidden" }}
         >
+          <div className={`${styles.messageListContent} ${showFolderSwitchOverlay ? styles.messageListContentBlurred : ""}`}>
           {controllerState?.pendingNewCount && controllerState.pendingNewCount > 0 ? (
             <div style={{ padding: "8px", textAlign: "center" }}>
               <button
@@ -513,6 +540,17 @@ export default function MailPage() {
               }}
             </VariableSizeList>
           ) : null}
+          </div>
+
+          {showFolderSwitchOverlay && (
+            <div className={styles.messageListOverlay} role="status" aria-live="polite">
+              <div className={styles.messageListOverlayCard}>
+                <span className={styles.messageListOverlayDuck} aria-hidden="true">🦆</span>
+                <LoaderCircle className={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
+                <span>{messageHook.searchQuery.trim() ? t("mail.searching") : t("mail.loadingEmails")}</span>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Footer */}
@@ -698,7 +736,7 @@ export default function MailPage() {
                   folderIndex={mailboxHook.folderIndex}
                   mailboxById={mailboxHook.mailboxById}
                   folderId={mailboxHook.folderId}
-                  setFolderId={mailboxHook.setFolderId}
+                  setFolderId={setFolderIdWithOverlay}
                   effectiveOpenFolderIds={mailboxHook.effectiveOpenFolderIds}
                   visibleFolderIds={mailboxHook.visibleFolderIds}
                   toggleFolderOpen={mailboxHook.toggleFolderOpen}
