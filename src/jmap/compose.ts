@@ -1,6 +1,7 @@
 import { findResponse, generateCallId, isErrorResponse, jmapRequest, type JmapMethodResponse } from "./client";
 import { getMailboxes, JMAP_CORE, JMAP_MAIL } from "./mailbox";
 import type { JmapSession } from "./normalizeSession";
+import { htmlToPlainText } from "./htmlToText";
 
 export const JMAP_SUBMISSION = "urn:ietf:params:jmap:submission";
 
@@ -302,14 +303,17 @@ function buildBodyStructure(params: {
   attachments: UploadedBlob[];
   inlineImages: Array<UploadedBlob & { cid: string }>;
 }): { bodyStructure: EmailBodyPart; bodyValues: Record<string, EmailBodyValue> } {
-  const htmlPartId = "1";
+  const textPartId = "1";
+  const htmlPartId = "2";
   // Stalwart validates that you MUST NOT specify a charset when providing a `partId`
   // with inlined `bodyValues` (it considers the charset implicit/derived).
   const allowedInlineCids = new Set(params.inlineImages.map((i) => i.cid).filter(Boolean));
   const htmlBody = allowedInlineCids.size > 0 ? rewriteInlineImagesToCid(params.htmlBody, allowedInlineCids) : (params.htmlBody || "");
 
+  const textBody = htmlToPlainText(htmlBody);
+  const textPart: EmailBodyPart = { partId: textPartId, type: "text/plain" };
   const htmlPart: EmailBodyPart = { partId: htmlPartId, type: "text/html" };
-  const bodyValues: Record<string, EmailBodyValue> = { [htmlPartId]: { value: htmlBody } };
+  const bodyValues: Record<string, EmailBodyValue> = { [textPartId]: { value: textBody }, [htmlPartId]: { value: htmlBody } };
 
   const inlineParts: EmailBodyPart[] = params.inlineImages.map((img) => ({
     blobId: img.blobId,
@@ -328,13 +332,8 @@ function buildBodyStructure(params: {
     size: a.size
   }));
 
-  // No inline images and no attachments -> simple HTML part.
-  if (inlineParts.length === 0 && attachmentParts.length === 0) {
-    return { bodyStructure: htmlPart, bodyValues };
-  }
-
   // Inline images present -> wrap the HTML + inline parts into multipart/related.
-  const related: EmailBodyPart =
+  const htmlWithInline: EmailBodyPart =
     inlineParts.length > 0
       ? {
           type: "multipart/related",
@@ -342,19 +341,24 @@ function buildBodyStructure(params: {
         }
       : htmlPart;
 
+  // Always provide a text/plain alternative for compatibility.
+  const alternative: EmailBodyPart = {
+    type: "multipart/alternative",
+    subParts: [textPart, htmlWithInline]
+  };
+
   // Attachments present -> wrap everything into multipart/mixed.
   if (attachmentParts.length > 0) {
     return {
       bodyStructure: {
         type: "multipart/mixed",
-        subParts: [related, ...attachmentParts]
+        subParts: [alternative, ...attachmentParts]
       },
       bodyValues
     };
   }
 
-  // Inline images only -> multipart/related.
-  return { bodyStructure: related, bodyValues };
+  return { bodyStructure: alternative, bodyValues };
 }
 
 export async function upsertDraftEmail(params: {
