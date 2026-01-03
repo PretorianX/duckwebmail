@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Enable Vitest coverage reporting (add `@vitest/coverage-v8`) and update Vitest config for v4 (remove deprecated `poolOptions`, run deterministically with `fileParallelism=false`).
+- Harden + expand unit test coverage: add focused tests for HTML sanitization, auth sign-in/rehydration, JMAP WebSocket push client, and core JMAP email operations; consolidate `SafeEmailViewer` HTML sanitization to use the shared sanitizer.
+- Add nginx rate limiting for `GET /jmap/session` (login + session rehydration) as defense-in-depth against brute-force attempts.
 - Mark sent emails as read (set JMAP `$seen` keyword) when moving Drafts → Sent after `EmailSubmission/set`.
 - Always include a `text/plain` MIME alternative when composing/sending (generate from WYSIWYG HTML) so messages render on plain-text-only clients/devices.
 - Update production deployment to run behind host-managed nginx/certbot (remove them from `docker-compose.prod.yml`), publish localhost-only ports for the UI and Stalwart JMAP, switch Stalwart prod to use vendor image (like dev), mount certbot-managed TLS into Stalwart, add host nginx configs for `webmail.mail-duck.com` + `mail.mailduck.systems` including an HTTP-only bootstrap config for initial cert generation, and make prod `VITE_*` defaults configurable at runtime via env injection in `server.mjs`.

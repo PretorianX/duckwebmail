@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import DOMPurify from "dompurify";
 import styled, { keyframes } from "styled-components";
 import { useTranslation } from "react-i18next";
+
+import { sanitizeEmailHtml } from "./sanitizeEmailHtml";
 
 function normalizePlainTextForDisplay(value: string): string {
   // Some servers/paths deliver plain text with literal escape sequences ("\\r\\n")
@@ -96,19 +97,7 @@ export default function SafeEmailViewer({
   const [isLoading, setIsLoading] = useState(true);
 
   const sanitizedHtml = useMemo(() => {
-    if (!htmlContent || htmlContent.trim().length === 0) return "";
-    return (
-      DOMPurify.sanitize(htmlContent, {
-        ADD_TAGS: ["style"],
-        ADD_ATTR: ["target"],
-        FORBID_TAGS: ["script", "iframe", "object", "embed"],
-        FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover"],
-        ALLOW_DATA_ATTR: false,
-        // Allow inline images rewritten to blob: URLs (created after authenticated fetch).
-        // Keep this tight: only allow http(s), mailto/tel, blob and data.
-        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|blob|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
-      }) ?? ""
-    );
+    return sanitizeEmailHtml(htmlContent || "");
   }, [htmlContent]);
 
   const normalizedText = useMemo(() => normalizePlainTextForDisplay(textContent || ""), [textContent]);
