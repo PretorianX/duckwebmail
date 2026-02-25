@@ -27,7 +27,7 @@ const MenuButton = styled.button`
   transition: all 0.2s ease;
 
   &:hover {
-    background-color: rgba(247, 148, 29, 0.12);
+    background-color: rgba(var(--duck-orange-rgb), 0.12);
   }
 `;
 
@@ -97,8 +97,8 @@ const MenuItem = styled.button`
   font-weight: 900;
 
   &:hover {
-    background: rgba(255, 204, 0, 0.08);
-    border-color: rgba(255, 204, 0, 0.25);
+    background: rgba(var(--accent-rgb), 0.08);
+    border-color: rgba(var(--accent-rgb), 0.25);
   }
 `;
 

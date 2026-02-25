@@ -31,7 +31,7 @@
 }
 
 .backButton:hover {
-  background-color: rgba(247, 148, 29, 0.12);
+  background-color: rgba(var(--duck-orange-rgb), 0.12);
 }
 
 .center {
@@ -99,7 +99,7 @@
 
 .select:focus {
   border-color: var(--duck-orange);
-  box-shadow: 0 0 0 3px rgba(247, 148, 29, 0.25);
+  box-shadow: 0 0 0 3px rgba(var(--duck-orange-rgb), 0.25);
 }
 
 @media (max-width: 880px) {

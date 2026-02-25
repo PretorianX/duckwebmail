@@ -199,7 +199,6 @@ describe("MailPage", () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderMailPage();
 
-    // Bodies should be in the DOM even before expanding, but hidden.
     const welcomeRegion = await screen.findByTestId("message-body-m1");
     const invoiceRegion = await screen.findByTestId("message-body-m2");
     expect(welcomeRegion).toBeInTheDocument();
@@ -210,6 +209,7 @@ describe("MailPage", () => {
     await user.click(welcome);
     expect(welcomeRegion).toBeVisible();
 
+    await new Promise((r) => setTimeout(r, 250));
     await user.click(welcome);
     expect(welcomeRegion).not.toBeVisible();
     expect(welcomeRegion).toBeInTheDocument();

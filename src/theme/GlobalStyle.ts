@@ -10,6 +10,7 @@ const GlobalStyle = createGlobalStyle`
     --text-primary: #333;
     --text-secondary: #666;
     --accent-color: #ffcc00;
+    --accent-rgb: 255, 204, 0;
     --hover-color: rgba(255, 204, 0, 0.08);
     --border-color: #ddd;
 
@@ -24,6 +25,7 @@ const GlobalStyle = createGlobalStyle`
 
     /* Duck theme colors */
     --duck-orange: #f7941d;
+    --duck-orange-rgb: 247, 148, 29;
     --duck-orange-light: #ffa940;
     --duck-black: #222222;
     --duck-gray: #f0f0f0;
@@ -55,6 +57,7 @@ const GlobalStyle = createGlobalStyle`
     --text-primary: #e2e8f0;
     --text-secondary: #a0aec0;
     --accent-color: #ffcc00;
+    --accent-rgb: 255, 204, 0;
     --hover-color: rgba(255, 204, 0, 0.08);
     --border-color: #4a5568;
 
@@ -67,6 +70,7 @@ const GlobalStyle = createGlobalStyle`
     --shadow-color: rgba(0, 0, 0, 0.5);
 
     --duck-orange: #ff9f30;
+    --duck-orange-rgb: 255, 159, 48;
     --duck-orange-light: #ffb860;
     --duck-black: #e2e8f0;
     --duck-gray: #2d3748;
@@ -87,6 +91,7 @@ ${schemeCss}
     --text-primary: #34485e;
     --text-secondary: #6b7c93;
     --accent-color: #f4a261;
+    --accent-rgb: 244, 162, 97;
     --hover-color: rgba(244,162,97,0.15);
     --border-color: rgba(0,0,0,0.06);
 
@@ -99,6 +104,7 @@ ${schemeCss}
     --shadow-color: rgba(0, 0, 0, 0.10);
 
     --duck-orange: var(--accent-color);
+    --duck-orange-rgb: 244, 162, 97;
     --duck-orange-light: #f7b27d;
     --dark-button-text: #0d1b2a;
   }
