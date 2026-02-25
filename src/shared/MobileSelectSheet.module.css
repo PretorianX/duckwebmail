@@ -15,8 +15,8 @@
 }
 
 .trigger:hover {
-  border-color: rgba(255, 204, 0, 0.45);
-  background: rgba(255, 204, 0, 0.06);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: rgba(var(--accent-rgb), 0.06);
 }
 
 .triggerValue {
@@ -109,13 +109,13 @@
 }
 
 .option:hover {
-  background: rgba(255, 204, 0, 0.08);
-  border-color: rgba(255, 204, 0, 0.25);
+  background: rgba(var(--accent-rgb), 0.08);
+  border-color: rgba(var(--accent-rgb), 0.25);
 }
 
 .optionActive {
-  background: rgba(255, 204, 0, 0.16);
-  border-color: rgba(255, 204, 0, 0.35);
+  background: rgba(var(--accent-rgb), 0.16);
+  border-color: rgba(var(--accent-rgb), 0.35);
 }
 
 .optionRight {

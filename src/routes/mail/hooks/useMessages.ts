@@ -34,10 +34,14 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
   const [searchQuery, setSearchQuery] = useState("");
   const [searchIncludeBody, setSearchIncludeBody] = useState(false);
   const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(() => new Set());
+  const expandedMessageIdsRef = useRef(expandedMessageIds);
   const [expandedAttachmentIds, setExpandedAttachmentIds] = useState<Set<string>>(() => new Set());
   const [expandedToIds, setExpandedToIds] = useState<Set<string>>(() => new Set());
   const [bodyLoadingIds, setBodyLoadingIds] = useState<Set<string>>(() => new Set());
   const [bodyErrors, setBodyErrors] = useState<Record<string, string>>({});
+
+  const toggleCooldownRef = useRef<Map<string, number>>(new Map());
+  const TOGGLE_COOLDOWN_MS = 200;
   const [rowActionsMessageId, setRowActionsMessageId] = useState<string | null>(null);
   const [bimiLogos, setBimiLogos] = useState<Map<string, string | null>>(new Map());
   const [messageBodies, setMessageBodies] = useState<Map<string, { html?: string; text?: string }>>(new Map());
@@ -46,6 +50,10 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
   );
   const messageBodiesRef = useRef(messageBodies);
   const messageAttachmentsRef = useRef(messageAttachments);
+
+  useEffect(() => {
+    expandedMessageIdsRef.current = expandedMessageIds;
+  }, [expandedMessageIds]);
 
   useEffect(() => {
     messageBodiesRef.current = messageBodies;
@@ -210,6 +218,7 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
     setDraggingEmailId(null);
     setDraggingEmailFromFolderId(null);
     setMessageAttachments(new Map());
+    toggleCooldownRef.current.clear();
   }, [folderId]);
 
   // Load messages when folder changes
@@ -328,94 +337,98 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
     return { html: doc.body.innerHTML, objectUrls };
   }, [auth]);
 
-  // Toggle message expansion
-  const toggleExpanded = useCallback((messageId: string) => {
-    const ensureBodyLoaded = async (targetMessageId: string) => {
-      if (!auth) return;
-      if (messageBodiesRef.current.has(targetMessageId) && messageAttachmentsRef.current.has(targetMessageId)) return;
-      setBodyErrors((prev) => {
-        if (!prev[targetMessageId]) return prev;
-        const next = { ...prev };
-        delete next[targetMessageId];
-        return next;
-      });
-      setBodyLoadingIds((prev) => {
-        if (prev.has(targetMessageId)) return prev;
-        const next = new Set(prev);
-        next.add(targetMessageId);
-        return next;
-      });
+  const ensureBodyLoaded = useCallback(async (targetMessageId: string) => {
+    if (!auth) return;
+    if (messageBodiesRef.current.has(targetMessageId) && messageAttachmentsRef.current.has(targetMessageId)) return;
+    setBodyErrors((prev) => {
+      if (!prev[targetMessageId]) return prev;
+      const next = { ...prev };
+      delete next[targetMessageId];
+      return next;
+    });
+    setBodyLoadingIds((prev) => {
+      if (prev.has(targetMessageId)) return prev;
+      const next = new Set(prev);
+      next.add(targetMessageId);
+      return next;
+    });
 
-      try {
-        const body = await getEmailBody({
-          apiUrl: auth.session.apiUrl,
-          authHeader: auth.authHeader,
-          accountId: auth.accountId,
-          emailId: targetMessageId
-        });
-        const resolved = body.html
-          ? await resolveCidImagesToObjectUrls(body.html, body.bodyStructure)
-          : { html: body.html ?? "", objectUrls: [] };
-
-        const extracted = extractAttachmentsFromBodyStructure(body.bodyStructure);
-        setMessageBodies((prev) => {
-          const next = new Map(prev);
-          next.set(targetMessageId, { html: resolved.html || undefined, text: body.text });
-          return next;
-        });
-        setMessageAttachments((prev) => {
-          const next = new Map(prev);
-          next.set(targetMessageId, extracted);
-          return next;
-        });
-      } catch (err) {
-        setBodyErrors((prev) => ({
-          ...prev,
-          [targetMessageId]: err instanceof Error ? err.message : "Failed to load message body"
-        }));
-      } finally {
-        setBodyLoadingIds((prev) => {
-          const next = new Set(prev);
-          next.delete(targetMessageId);
-          return next;
-        });
-      }
-    };
-
-    const markAsReadIfNeeded = async (targetMessageId: string) => {
-      if (!auth) return;
-      if (!controllerRef.current) return;
-
-      const state = controllerRef.current.getState();
-      const item = state?.itemsById.get(targetMessageId);
-      if (!item || !isUnread(item.keywords)) return;
-
-      controllerRef.current.updateItem(targetMessageId, (email) => ({
-        ...email,
-        keywords: { ...email.keywords, "$seen": true }
-      }));
-      syncControllerState();
-
-      const success = await markEmailAsRead({
+    try {
+      const body = await getEmailBody({
         apiUrl: auth.session.apiUrl,
         authHeader: auth.authHeader,
         accountId: auth.accountId,
         emailId: targetMessageId
       });
+      const resolved = body.html
+        ? await resolveCidImagesToObjectUrls(body.html, body.bodyStructure)
+        : { html: body.html ?? "", objectUrls: [] };
 
-      if (success) {
-        void loadMailboxes({ force: true });
-      } else {
-        controllerRef.current.updateItem(targetMessageId, (email) => {
-          const keywords = { ...email.keywords };
-          delete keywords["$seen"];
-          return { ...email, keywords };
-        });
-        syncControllerState();
-      }
-    };
+      const extracted = extractAttachmentsFromBodyStructure(body.bodyStructure);
+      setMessageBodies((prev) => {
+        const next = new Map(prev);
+        next.set(targetMessageId, { html: resolved.html || undefined, text: body.text });
+        return next;
+      });
+      setMessageAttachments((prev) => {
+        const next = new Map(prev);
+        next.set(targetMessageId, extracted);
+        return next;
+      });
+    } catch (err) {
+      setBodyErrors((prev) => ({
+        ...prev,
+        [targetMessageId]: err instanceof Error ? err.message : "Failed to load message body"
+      }));
+    } finally {
+      setBodyLoadingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(targetMessageId);
+        return next;
+      });
+    }
+  }, [auth, resolveCidImagesToObjectUrls]);
 
-    const wasOpen = expandedMessageIds.has(messageId);
+  const markAsReadIfNeeded = useCallback(async (targetMessageId: string) => {
+    if (!auth) return;
+    if (!controllerRef.current) return;
+
+    const state = controllerRef.current.getState();
+    const item = state?.itemsById.get(targetMessageId);
+    if (!item || !isUnread(item.keywords)) return;
+
+    controllerRef.current.updateItem(targetMessageId, (email) => ({
+      ...email,
+      keywords: { ...email.keywords, "$seen": true }
+    }));
+    syncControllerState();
+
+    const success = await markEmailAsRead({
+      apiUrl: auth.session.apiUrl,
+      authHeader: auth.authHeader,
+      accountId: auth.accountId,
+      emailId: targetMessageId
+    });
+
+    if (success) {
+      void loadMailboxes({ force: true });
+    } else {
+      controllerRef.current.updateItem(targetMessageId, (email) => {
+        const keywords = { ...email.keywords };
+        delete keywords["$seen"];
+        return { ...email, keywords };
+      });
+      syncControllerState();
+    }
+  }, [auth, loadMailboxes, syncControllerState]);
+
+  const toggleExpanded = useCallback((messageId: string) => {
+    const now = Date.now();
+    const lastToggle = toggleCooldownRef.current.get(messageId) ?? 0;
+    if (now - lastToggle < TOGGLE_COOLDOWN_MS) return;
+    toggleCooldownRef.current.set(messageId, now);
+
+    const wasOpen = expandedMessageIdsRef.current.has(messageId);
     setExpandedMessageIds((prev) => {
       const next = new Set(prev);
       if (next.has(messageId)) next.delete(messageId);
@@ -427,7 +440,7 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
       void ensureBodyLoaded(messageId);
       void markAsReadIfNeeded(messageId);
     }
-  }, [auth, expandedMessageIds, loadMailboxes, resolveCidImagesToObjectUrls, syncControllerState]);
+  }, [ensureBodyLoaded, markAsReadIfNeeded]);
 
   const toggleAttachments = useCallback((messageId: string) => {
     setExpandedAttachmentIds((prev) => {

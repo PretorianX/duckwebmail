@@ -70,6 +70,25 @@ export default function MailPage() {
   const rowGroupRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const defaultRowHeight = isDenseDesktop ? 43 : isDesktop ? 48 : 56;
 
+  const resetRafRef = useRef(0);
+  const resetMinIndexRef = useRef(Infinity);
+  const scheduleVirtualListReset = useCallback((index: number) => {
+    resetMinIndexRef.current = Math.min(resetMinIndexRef.current, index);
+    if (resetRafRef.current) return;
+    resetRafRef.current = window.requestAnimationFrame(() => {
+      resetRafRef.current = 0;
+      const idx = resetMinIndexRef.current;
+      resetMinIndexRef.current = Infinity;
+      virtualListRef.current?.resetAfterIndex(idx);
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (resetRafRef.current) window.cancelAnimationFrame(resetRafRef.current);
+    };
+  }, []);
+
   // Hooks
   const mailboxHook = useMailboxes(auth);
   const quotaHook = useQuotas(auth);
@@ -487,7 +506,7 @@ export default function MailPage() {
                             const current = rowHeightsRef.current.get(msg.id);
                             if (measured > 0 && current !== measured) {
                               rowHeightsRef.current.set(msg.id, measured);
-                              virtualListRef.current?.resetAfterIndex(index);
+                              scheduleVirtualListReset(index);
                             }
                           });
                           observer.observe(el);
@@ -497,7 +516,7 @@ export default function MailPage() {
                         const current = rowHeightsRef.current.get(msg.id);
                         if (measured > 0 && current !== measured) {
                           rowHeightsRef.current.set(msg.id, measured);
-                          virtualListRef.current?.resetAfterIndex(index);
+                          scheduleVirtualListReset(index);
                         }
                       }}
                     >

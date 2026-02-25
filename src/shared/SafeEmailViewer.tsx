@@ -77,8 +77,8 @@ const LoadingOverlay = styled.div`
 const Spinner = styled.div`
   width: 24px;
   height: 24px;
-  border: 3px solid rgba(255, 204, 0, 0.25);
-  border-top-color: #ffcc00;
+  border: 3px solid rgba(var(--accent-rgb), 0.25);
+  border-top-color: var(--accent-color);
   border-radius: 50%;
   animation: ${spin} 0.8s linear infinite;
 `;
@@ -114,7 +114,7 @@ export default function SafeEmailViewer({
     const iframe = iframeRef.current;
     if (!iframe) return;
     const doc = iframe.contentDocument;
-    if (!doc) return;
+    if (!doc?.body || !doc.documentElement) return;
     const height = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
     iframe.style.height = `${height}px`;
   };

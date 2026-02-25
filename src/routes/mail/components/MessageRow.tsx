@@ -1,4 +1,4 @@
-import type { HTMLAttributes, MutableRefObject } from "react";
+import { memo, type HTMLAttributes, type MutableRefObject } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
@@ -34,7 +34,7 @@ type MessageRowProps = {
   onDragEnd: () => void;
 };
 
-export function MessageRow({
+export const MessageRow = memo(function MessageRow({
   msg,
   isOpen,
   activeProfileName,
@@ -266,5 +266,5 @@ export function MessageRow({
       </div>
     </div>
   );
-}
+});
 

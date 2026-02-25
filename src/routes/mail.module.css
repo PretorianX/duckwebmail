@@ -71,12 +71,12 @@
 }
 
 .headerEmail:hover {
-  border-color: rgba(255, 204, 0, 0.45);
-  background: rgba(255, 204, 0, 0.08);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 .headerEmail:active {
-  background: rgba(255, 204, 0, 0.16);
+  background: rgba(var(--accent-rgb), 0.16);
 }
 
 .sidebar {
@@ -169,8 +169,8 @@
 }
 
 .folderFilter:focus {
-  border-color: rgba(255, 204, 0, 0.65);
-  box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.18);
+  border-color: rgba(var(--accent-rgb), 0.65);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.18);
 }
 
 .folderRight {
@@ -209,8 +209,8 @@
 }
 
 .folderItemDropTarget {
-  border-color: rgba(255, 204, 0, 0.65) !important;
-  background: rgba(255, 204, 0, 0.1) !important;
+  border-color: rgba(var(--accent-rgb), 0.65) !important;
+  background: rgba(var(--accent-rgb), 0.1) !important;
 }
 
 .folderOpModal {
@@ -289,13 +289,13 @@
 }
 
 .folderItem:hover {
-  background: rgba(255, 204, 0, 0.05);
-  border-color: rgba(255, 204, 0, 0.2);
+  background: rgba(var(--accent-rgb), 0.05);
+  border-color: rgba(var(--accent-rgb), 0.2);
 }
 
 .folderItemActive {
-  background: rgba(255, 204, 0, 0.12);
-  border-color: rgba(255, 204, 0, 0.3);
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.3);
 }
 
 .folderItemActive .folderLabel {
@@ -326,7 +326,7 @@
 }
 
 .folderLabelParentOpen .folderToggle {
-  background: rgba(255, 204, 0, 0.1);
+  background: rgba(var(--accent-rgb), 0.1);
   color: var(--text-color);
 }
 
@@ -343,7 +343,7 @@
 }
 
 .folderToggle:hover {
-  background: rgba(255, 204, 0, 0.06);
+  background: rgba(var(--accent-rgb), 0.06);
   color: var(--text-color);
 }
 
@@ -452,8 +452,8 @@
 }
 
 .search:focus {
-  border-color: rgba(255, 204, 0, 0.65);
-  box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.22);
+  border-color: rgba(var(--accent-rgb), 0.65);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.22);
 }
 
 .searchBodyToggle {
@@ -661,13 +661,13 @@
 }
 
 .sheetFolderItem:hover {
-  background: rgba(255, 204, 0, 0.08);
-  border-color: rgba(255, 204, 0, 0.25);
+  background: rgba(var(--accent-rgb), 0.08);
+  border-color: rgba(var(--accent-rgb), 0.25);
 }
 
 .sheetFolderItemActive {
-  background: rgba(255, 204, 0, 0.16);
-  border-color: rgba(255, 204, 0, 0.35);
+  background: rgba(var(--accent-rgb), 0.16);
+  border-color: rgba(var(--accent-rgb), 0.35);
 }
 
 .list {
@@ -825,8 +825,8 @@
 }
 
 .rowGroupOpen {
-  border-color: rgba(255, 204, 0, 0.5);
-  box-shadow: 0 1px 6px rgba(255, 204, 0, 0.2);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  box-shadow: 0 1px 6px rgba(var(--accent-rgb), 0.2);
 }
 
 .row {
@@ -848,7 +848,7 @@
 }
 
 .row:hover {
-  background: rgba(255, 204, 0, 0.06);
+  background: rgba(var(--accent-rgb), 0.06);
 }
 
 .rowGrid {
@@ -863,8 +863,8 @@
   width: 30px;
   height: 30px;
   border-radius: 999px;
-  background: rgba(255, 204, 0, 0.14);
-  border: 1px solid rgba(255, 204, 0, 0.35);
+  background: rgba(var(--accent-rgb), 0.14);
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
   color: var(--text-color);
   display: inline-flex;
   align-items: center;
@@ -993,7 +993,7 @@
   border-radius: 999px;
   border: 1px solid var(--border-color);
   color: var(--light-text);
-  background: rgba(255, 204, 0, 0.06);
+  background: rgba(var(--accent-rgb), 0.06);
   font-weight: 900;
   font-size: 0.78rem;
   line-height: 1;
@@ -1026,8 +1026,8 @@
 }
 
 .attachmentsToggle:hover {
-  border-color: rgba(255, 204, 0, 0.45);
-  background: rgba(255, 204, 0, 0.08);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 .attachmentsToggleLabel {
@@ -1074,13 +1074,13 @@
 }
 
 .iconButton:hover {
-  border-color: rgba(255, 204, 0, 0.45);
-  background: rgba(255, 204, 0, 0.08);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 .iconButtonActive {
   color: var(--duck-orange);
-  border-color: rgba(255, 204, 0, 0.45);
+  border-color: rgba(var(--accent-rgb), 0.45);
 }
 
 .dangerButton {
@@ -1199,8 +1199,8 @@
 }
 
 .attachmentChip:hover {
-  border-color: rgba(255, 204, 0, 0.45);
-  background: rgba(255, 204, 0, 0.08);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 .attachmentName {
@@ -1229,7 +1229,7 @@
   padding: 8px 10px 10px;
   border: 1px solid var(--border-color);
   border-radius: 14px;
-  background: rgba(255, 204, 0, 0.06);
+  background: rgba(var(--accent-rgb), 0.06);
 }
 
 .attachmentSheetNameRow {
@@ -1381,19 +1381,19 @@
 }
 
 .miniToggle:hover {
-  border-color: rgba(255, 204, 0, 0.45);
-  background: rgba(255, 204, 0, 0.08);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 .miniToggle:focus {
   outline: none;
-  border-color: rgba(255, 204, 0, 0.65);
-  box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.18);
+  border-color: rgba(var(--accent-rgb), 0.65);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.18);
 }
 
 .miniToggle[aria-pressed="true"] {
-  border-color: rgba(255, 204, 0, 0.65);
-  background: rgba(255, 204, 0, 0.16);
+  border-color: rgba(var(--accent-rgb), 0.65);
+  background: rgba(var(--accent-rgb), 0.16);
 }
 
 .input,
@@ -1568,7 +1568,7 @@
 }
 
 .sendMenuItem:hover {
-  background: rgba(255, 204, 0, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 .sendMenuItemRow {
@@ -1603,7 +1603,7 @@
 .attachmentChipCompose {
   max-width: 100%;
   border: 1px solid var(--border-color);
-  background: rgba(255, 204, 0, 0.06);
+  background: rgba(var(--accent-rgb), 0.06);
   color: var(--text-color);
   border-radius: 999px;
   padding: 6px 10px;
@@ -1798,8 +1798,8 @@
   }
 
   .folderSwitcher:hover {
-    border-color: rgba(255, 204, 0, 0.45);
-    background: rgba(255, 204, 0, 0.06);
+    border-color: rgba(var(--accent-rgb), 0.45);
+    background: rgba(var(--accent-rgb), 0.06);
   }
 
   .folderSwitcherDuck {
@@ -1964,8 +1964,8 @@
 
   .rightCellExpanded .mobileActionButton:hover,
   .rightCellExpanded .mobileActionButton:active {
-    border-color: rgba(255, 204, 0, 0.45);
-    background: rgba(255, 204, 0, 0.08);
+    border-color: rgba(var(--accent-rgb), 0.45);
+    background: rgba(var(--accent-rgb), 0.08);
   }
 
   .rightCellExpanded .mobileActionButton .icon {

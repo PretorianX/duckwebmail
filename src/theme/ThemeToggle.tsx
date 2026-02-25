@@ -19,7 +19,7 @@ const ToggleButton = styled.button`
   transition: all 0.2s ease;
 
   &:hover {
-    background-color: rgba(247, 148, 29, 0.12);
+    background-color: rgba(var(--duck-orange-rgb), 0.12);
   }
 `;
 
