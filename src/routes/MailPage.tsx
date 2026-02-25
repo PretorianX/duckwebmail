@@ -83,6 +83,12 @@ export default function MailPage() {
     });
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (resetRafRef.current) window.cancelAnimationFrame(resetRafRef.current);
+    };
+  }, []);
+
   // Hooks
   const mailboxHook = useMailboxes(auth);
   const quotaHook = useQuotas(auth);

@@ -218,6 +218,7 @@ export function useMessages({ auth, folderId, isDesktop, loadMailboxes }: UseMes
     setDraggingEmailId(null);
     setDraggingEmailFromFolderId(null);
     setMessageAttachments(new Map());
+    toggleCooldownRef.current.clear();
   }, [folderId]);
 
   // Load messages when folder changes
