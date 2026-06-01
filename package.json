@@ -44,7 +44,7 @@
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
     "@vitejs/plugin-react": "^4.3.3",
-    "@vitest/coverage-v8": "^4.0.16",
+    "@vitest/coverage-v8": "^4.1.8",
     "eslint": "^9.16.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.1.0",
@@ -52,6 +52,6 @@
     "jsdom": "^25.0.1",
     "typescript": "^5.7.2",
     "vite": "^6.4.2",
-    "vitest": "^4.0.16"
+    "vitest": "^4.1.8"
   }
 }
